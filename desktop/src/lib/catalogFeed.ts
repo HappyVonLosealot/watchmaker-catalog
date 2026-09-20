@@ -6,6 +6,8 @@ export const BACKDROP_ROOT = "https://image.tmdb.org/t/p/w1280";
 export const PROVIDER_LOGO_ROOT = "https://image.tmdb.org/t/p/w92";
 const IMAGE_PATH = /^\/[A-Za-z0-9._/-]+$/;
 const SEMANTIC_VECTOR = /^[A-Za-z0-9+/]{512}$/;
+const DISNEY_ENTITY_PATH = /^\/[a-z]{2}-[a-z]{2}\/browse\/entity-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/?$/i;
+const DISNEY_LEGACY_PATH = /^\/[a-z]{2}-[a-z]{2}\/(movies|series)\/wd\/[A-Za-z0-9_-]{6,32}\/?$/;
 const MAX_SLICE_ITEMS = 100_000;
 
 const BUNDLED_FEED_ROOT = "/catalog/v1";
@@ -104,7 +106,47 @@ function assertProvider(provider: Provider): void {
   }
 }
 
-function assertItem(item: CatalogItem, provider: Provider, mediaType: MediaType): void {
+function isSafePublishedDisneyLink(
+  url: unknown,
+  item: CatalogItem,
+  region: string,
+  language: string,
+): boolean {
+  if (typeof url !== "string") return false;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.hash) return false;
+    const locale = `${language.slice(0, 2).toLocaleLowerCase("en-US")}-${region.toLocaleLowerCase("en-US")}`;
+
+    if (parsed.hostname === "www.disneyplus.com") {
+      if (parsed.search || !parsed.pathname.toLocaleLowerCase("en-US").startsWith(`/${locale}/`)) {
+        return false;
+      }
+      if (DISNEY_ENTITY_PATH.test(parsed.pathname)) return true;
+      const legacy = parsed.pathname.match(DISNEY_LEGACY_PATH);
+      return legacy?.[1] === (item.mediaType === "movie" ? "movies" : "series");
+    }
+
+    if (parsed.hostname === "www.themoviedb.org") {
+      return (
+        parsed.pathname === `/${item.mediaType}/${item.tmdbId}/watch` &&
+        [...parsed.searchParams.keys()].length === 1 &&
+        parsed.searchParams.get("locale") === region
+      );
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+function assertItem(
+  item: CatalogItem,
+  provider: Provider,
+  mediaType: MediaType,
+  region: string,
+  language: string,
+): void {
   const expectedKey = `${mediaType}:${item.tmdbId}`;
   if (
     !Number.isSafeInteger(item.tmdbId) ||
@@ -145,6 +187,13 @@ function assertItem(item: CatalogItem, provider: Provider, mediaType: MediaType)
     item.providerLinks[0].providerName !== provider.name
   ) {
     throw new Error("The catalogue feed returned a title under the wrong service.");
+  }
+  const linkUrl = item.providerLinks[0].url;
+  if (
+    linkUrl !== undefined &&
+    (provider.id !== 337 || !isSafePublishedDisneyLink(linkUrl, item, region, language))
+  ) {
+    throw new Error("The catalogue feed returned an unsafe provider link.");
   }
 }
 
@@ -196,7 +245,9 @@ export async function fetchProviderCatalog(
     throw new Error("The catalogue feed returned a mismatched title slice.");
   }
   assertProvider(response.provider);
-  response.items.forEach((item) => assertItem(item, response.provider, mediaType));
+  response.items.forEach((item) =>
+    assertItem(item, response.provider, mediaType, settings.region, settings.language),
+  );
   return response.items.map((item) => ({
     ...item,
     providerLinks: item.providerLinks?.length

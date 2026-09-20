@@ -56,9 +56,10 @@ export function providerSearchUrl(providerName: string, title: string): string {
   if (name.includes("amazon") || name.includes("prime video")) {
     return `https://www.primevideo.com/search/ref=atv_nb_sr?phrase=${query}`;
   }
-  // Disney+ no longer exposes a stable external search route. Open its valid
-  // signed-in browse screen instead of sending the browser to a known 404.
-  if (name.includes("disney")) return "https://www.disneyplus.com/browse/home";
+  // Disney+ has no stable externally prefilled search route. This is only the
+  // legacy-feed fallback; current catalogue entries carry an exact Disney URL
+  // or a title-specific TMDb provider handoff.
+  if (name.includes("disney")) return `https://www.themoviedb.org/search?query=${query}`;
   if (name === "max" || name.includes("hbo max")) {
     return `https://play.max.com/search?q=${query}`;
   }
@@ -70,9 +71,11 @@ export function providerSearchUrl(providerName: string, title: string): string {
 }
 
 export function resolveProviderUrl(item: CatalogItem, link: ProviderLink): string {
-  return link.url && isAllowedExternalUrl(link.url)
-    ? link.url
-    : providerSearchUrl(link.providerName, item.title);
+  if (link.url && isAllowedExternalUrl(link.url)) return link.url;
+  if (link.providerName.toLocaleLowerCase("en-US").includes("disney")) {
+    return `https://www.themoviedb.org/${item.mediaType}/${item.tmdbId}/watch`;
+  }
+  return providerSearchUrl(link.providerName, item.title);
 }
 
 async function openHttpsUrl(url: string): Promise<void> {

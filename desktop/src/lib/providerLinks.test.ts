@@ -38,9 +38,32 @@ describe("external provider handoff", () => {
     expect(providerSearchUrl(provider, item.title)).toBe(expected);
   });
 
-  it("opens Disney+'s valid signed-in browse screen instead of its dead query route", () => {
+  it("uses a title-specific TMDb search instead of Disney+'s dead query route", () => {
     expect(providerSearchUrl("Disney Plus", item.title)).toBe(
-      "https://www.disneyplus.com/browse/home",
+      "https://www.themoviedb.org/search?query=A%20Film%20%26%20Friends",
+    );
+  });
+
+  it("opens a published exact Disney+ entity page", () => {
+    const americanDad = {
+      ...item,
+      key: "tv:1433",
+      tmdbId: 1433,
+      mediaType: "tv" as const,
+      title: "American Dad!",
+    };
+    const link: ProviderLink = {
+      providerId: 337,
+      providerName: "Disney+",
+      url: "https://www.disneyplus.com/tr-tr/browse/entity-5b4ab988-e3a7-4750-a11a-9aa3d65f8cfe",
+    };
+    expect(resolveProviderUrl(americanDad, link)).toBe(link.url);
+  });
+
+  it("uses a title-specific watch handoff for an older Disney+ feed", () => {
+    const link: ProviderLink = { providerId: 337, providerName: "Disney+" };
+    expect(resolveProviderUrl(item, link)).toBe(
+      "https://www.themoviedb.org/movie/1/watch",
     );
   });
 

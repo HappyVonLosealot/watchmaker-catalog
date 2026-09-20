@@ -9,11 +9,14 @@ This repository builds the public, read-only catalogue used by the **Watchmaker*
 - Subscription (`flatrate`) availability only—rentals and purchases are excluded
 - Titles, descriptions, genres, ratings, release dates, provider links, and TMDb thumbnail paths
 - Precomputed multilingual synopsis fingerprints for meaning-based TasteMaker matches
+- Exact Disney+ title links resolved from free public Wikidata IDs when available
 - Turkish metadata with English fallback
 
 The generated files are published by GitHub Pages under `/v1`. Watchmaker downloads them only when the app starts; nothing runs in the background on the user's PC.
 
 TasteMaker's meaning fingerprints are generated during this free scheduled build with the Apache-2.0-licensed `paraphrase-multilingual-MiniLM-L12-v2` model. The desktop app downloads only compact int8 fingerprints and compares them locally. It runs no live AI model, calls no AI API, sends no viewing preference anywhere, and creates no cost for the user.
+
+Disney+ does not publish a stable externally prefilled search page. The catalogue therefore matches TMDb title IDs to public Wikidata Disney+ IDs during its free scheduled build. A match opens the exact localized Disney+ title page. An unmatched title opens TMDb's title-specific provider handoff instead of the Disney+ home page, so no title needs to be typed manually.
 
 ## Privacy and credentials
 

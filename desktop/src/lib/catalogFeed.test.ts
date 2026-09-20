@@ -85,6 +85,85 @@ describe("publisher-managed catalogue feed", () => {
     expect(results[0].backdropPath).toBe("/backdrop.jpg");
   });
 
+  it("accepts exact Disney+ links and title-specific TMDb handoffs", async () => {
+    const disneyProvider: Provider = {
+      id: 337,
+      name: "Disney+",
+      logoPath: "/disney.png",
+      kind: "watch",
+    };
+    const direct = {
+      ...item,
+      key: "tv:1433",
+      tmdbId: 1433,
+      title: "American Dad!",
+      providerLinks: [{
+        providerId: 337,
+        providerName: "Disney+",
+        url: "https://www.disneyplus.com/en-tr/browse/entity-5b4ab988-e3a7-4750-a11a-9aa3d65f8cfe",
+      }],
+    };
+    const handoff = {
+      ...direct,
+      key: "tv:2",
+      tmdbId: 2,
+      providerLinks: [{
+        providerId: 337,
+        providerName: "Disney+",
+        url: "https://www.themoviedb.org/tv/2/watch?locale=TR",
+      }],
+    };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      generatedAt: 1,
+      region: "TR",
+      language: "en-US",
+      provider: disneyProvider,
+      mediaType: "tv",
+      items: [direct, handoff],
+    }), { status: 200, headers: { "Content-Type": "application/json" } })));
+
+    await expect(fetchProviderCatalog(
+      { region: "TR", language: "en-US" },
+      disneyProvider,
+      "tv",
+      undefined,
+      "https://catalog.example/v1",
+    )).resolves.toHaveLength(2);
+  });
+
+  it("rejects a Disney+ link for the wrong locale or title", async () => {
+    const disneyProvider: Provider = {
+      id: 337,
+      name: "Disney+",
+      logoPath: null,
+      kind: "watch",
+    };
+    const unsafe = {
+      ...item,
+      providerLinks: [{
+        providerId: 337,
+        providerName: "Disney+",
+        url: "https://www.themoviedb.org/tv/999/watch?locale=TR",
+      }],
+    };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      generatedAt: 1,
+      region: "TR",
+      language: "en-US",
+      provider: disneyProvider,
+      mediaType: "tv",
+      items: [unsafe],
+    }), { status: 200, headers: { "Content-Type": "application/json" } })));
+
+    await expect(fetchProviderCatalog(
+      { region: "TR", language: "en-US" },
+      disneyProvider,
+      "tv",
+      undefined,
+      "https://catalog.example/v1",
+    )).rejects.toThrow("unsafe provider link");
+  });
+
   it("rejects a slice that tries to inject an external artwork URL", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
       generatedAt: 1,

@@ -1,6 +1,7 @@
 import { readFile, readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { FEED_SCHEMA_VERSION } from "./lib/catalog-generator.mjs";
+import { isSafePublishedDisneyUrl } from "./lib/disney-links.mjs";
 
 const root = path.resolve(process.argv[2] || process.env.WATCHMAKER_FEED_DIR || "catalog-dist/v1");
 const imagePathPattern = /^\/[A-Za-z0-9._/-]+$/;
@@ -14,6 +15,8 @@ let sliceCount = 0;
 let titleCount = 0;
 let posterCount = 0;
 let semanticVectorCount = 0;
+let directDisneyLinkCount = 0;
+let disneyHandoffCount = 0;
 
 function fail(location, message) {
   errors.push(`${location}: ${message}`);
@@ -44,7 +47,7 @@ function validateProvider(provider, location) {
   }
 }
 
-function validateItem(item, mediaType, provider, location, seen) {
+function validateItem(item, mediaType, provider, region, language, location, seen) {
   titleCount += 1;
   if (!Number.isSafeInteger(item?.tmdbId)) fail(location, "tmdbId must be a safe integer");
   if (item?.mediaType !== mediaType) fail(location, `expected mediaType ${mediaType}`);
@@ -79,7 +82,20 @@ function validateItem(item, mediaType, provider, location, seen) {
     if (link.providerId !== provider.id || link.providerName !== provider.name) {
       fail(location, "provider link does not match the containing slice");
     }
-    if ("url" in link && link.url !== undefined) {
+    if (provider.id === 337) {
+      if (!isSafePublishedDisneyUrl(link.url, {
+        mediaType,
+        tmdbId: item.tmdbId,
+        region,
+        language,
+      })) {
+        fail(location, "Disney+ link is not an approved exact-title URL or TMDb title handoff");
+      } else if (new URL(link.url).hostname === "www.disneyplus.com") {
+        directDisneyLinkCount += 1;
+      } else {
+        disneyHandoffCount += 1;
+      }
+    } else if ("url" in link && link.url !== undefined) {
       fail(location, "generated provider links must not contain unverified URLs");
     }
   }
@@ -166,7 +182,7 @@ for (const regionEntry of manifest.regions || []) {
         if (slice.itemCount !== slice.items.length) fail(slicePath, "itemCount is incorrect");
         const seen = new Set();
         slice.items.forEach((item, index) =>
-          validateItem(item, mediaType, provider, `${slicePath}#${index}`, seen),
+          validateItem(item, mediaType, provider, region, language, `${slicePath}#${index}`, seen),
         );
       }
     }
@@ -201,6 +217,20 @@ if (manifest.statistics) {
         `validated ${semanticVectorCount}`,
     );
   }
+  if (manifest.statistics.withDirectDisneyLinks !== directDisneyLinkCount) {
+    fail(
+      "manifest.json",
+      `statistics.withDirectDisneyLinks says ${manifest.statistics.withDirectDisneyLinks}, ` +
+        `validated ${directDisneyLinkCount}`,
+    );
+  }
+  if (manifest.statistics.withDisneyHandoffs !== disneyHandoffCount) {
+    fail(
+      "manifest.json",
+      `statistics.withDisneyHandoffs says ${manifest.statistics.withDisneyHandoffs}, ` +
+        `validated ${disneyHandoffCount}`,
+    );
+  }
 }
 
 if (warnings.length > 0) warnings.forEach((warning) => console.warn("Warning: " + warning));
@@ -213,6 +243,7 @@ if (errors.length > 0) {
       `${sliceCount.toLocaleString()} catalogue slices and ` +
       `${titleCount.toLocaleString()} provider-title records ` +
       `(${posterCount.toLocaleString()} with posters, ` +
-      `${semanticVectorCount.toLocaleString()} with semantic fingerprints).`,
+      `${semanticVectorCount.toLocaleString()} with semantic fingerprints, ` +
+      `${directDisneyLinkCount.toLocaleString()} direct Disney+ links).`,
   );
 }

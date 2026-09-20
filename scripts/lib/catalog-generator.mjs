@@ -6,6 +6,7 @@ import {
   SEMANTIC_VECTOR_DIMENSIONS,
   SEMANTIC_VECTOR_FORMAT,
 } from "./semantic-vectors.mjs";
+import { createDisneyLinkResolver } from "./disney-links.mjs";
 
 export const API_ROOT = "https://api.themoviedb.org/3";
 export const FEED_SCHEMA_VERSION = 2;
@@ -542,6 +543,8 @@ export async function generateCatalogFeed(configuration, dependencies = {}) {
   const tmdbGet = dependencies.tmdbGet || createTmdbClient(configuration);
   const logger = dependencies.logger || console;
   const generatedAt = dependencies.generatedAt || Date.now();
+  const disneyLinkResolver =
+    dependencies.disneyLinkResolver || createDisneyLinkResolver();
   const semanticEncoder =
     dependencies.semanticEncoder ||
     (await createSemanticEncoder({ batchSize: configuration.semanticBatchSize }));
@@ -554,6 +557,8 @@ export async function generateCatalogFeed(configuration, dependencies = {}) {
     titles: 0,
     withPosters: 0,
     withSemanticVectors: 0,
+    withDirectDisneyLinks: 0,
+    withDisneyHandoffs: 0,
   };
 
   await rm(buildingRoot, { recursive: true, force: true });
@@ -607,6 +612,17 @@ export async function generateCatalogFeed(configuration, dependencies = {}) {
               fallbackSlices.set(sliceKey, items);
             } else if (fallbackLanguage) {
               items = mergeLocalizedItems(items, fallbackSlices.get(sliceKey) ?? []);
+            }
+            if (providerGroup.provider.id === 337) {
+              const linked = await disneyLinkResolver.attach(items, {
+                mediaType,
+                region,
+                language,
+              });
+              items = linked.items;
+              statistics.withDirectDisneyLinks += linked.directCount;
+              statistics.withDisneyHandoffs += linked.fallbackCount;
+              warnings.push(...linked.warnings);
             }
             items = await semanticEncoder.attach(items);
             statistics.slices += 1;
