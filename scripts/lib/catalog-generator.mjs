@@ -438,6 +438,37 @@ export function mapResult(result, mediaType, provider, genres, generatedAt) {
   };
 }
 
+export function mergeLocalizedItems(primaryItems, fallbackItems) {
+  const fallbackByKey = new Map(fallbackItems.map((item) => [item.key, item]));
+  const merged = primaryItems.map((item) => {
+    const fallback = fallbackByKey.get(item.key);
+    fallbackByKey.delete(item.key);
+    if (!fallback) return item;
+
+    return {
+      ...item,
+      title:
+        item.title.trim() && item.title !== "Untitled"
+          ? item.title
+          : fallback.title,
+      originalTitle: item.originalTitle.trim() ? item.originalTitle : fallback.originalTitle,
+      overview: item.overview.trim() ? item.overview : fallback.overview,
+      posterPath: item.posterPath ?? fallback.posterPath,
+      backdropPath: item.backdropPath ?? fallback.backdropPath,
+      releaseDate: item.releaseDate || fallback.releaseDate,
+      genreIds: item.genreIds.length ? item.genreIds : fallback.genreIds,
+      genreNames: item.genreNames.length ? item.genreNames : fallback.genreNames,
+    };
+  });
+
+  // Discover normally returns the same IDs for every language. Including a
+  // fallback-only entry prevents a temporary localization gap from silently
+  // removing an otherwise available subscription title.
+  return [...merged, ...fallbackByKey.values()].sort(
+    (left, right) => right.popularity - left.popularity || left.title.localeCompare(right.title),
+  );
+}
+
 export async function fetchCatalogSlice({
   tmdbGet,
   region,
@@ -509,12 +540,17 @@ export async function generateCatalogFeed(configuration, dependencies = {}) {
   await mkdir(buildingRoot, { recursive: true });
   const resolveDropoutNetworkId = createDropoutNetworkResolver(tmdbGet);
   const manifestRegions = [];
+  const fallbackLanguage = configuration.languages.includes("en-US") ? "en-US" : null;
+  const generationLanguages = fallbackLanguage
+    ? [fallbackLanguage, ...configuration.languages.filter((language) => language !== fallbackLanguage)]
+    : configuration.languages;
 
   try {
     for (const region of configuration.regions) {
       statistics.regions += 1;
       manifestRegions.push({ code: region, languages: configuration.languages });
-      for (const language of configuration.languages) {
+      const fallbackSlices = new Map();
+      for (const language of generationLanguages) {
         statistics.locales += 1;
         logger.log(`Generating ${region}/${language}`);
         const [providerGroups, genres] = await Promise.all([
@@ -532,7 +568,7 @@ export async function generateCatalogFeed(configuration, dependencies = {}) {
 
         for (const providerGroup of providerGroups) {
           for (const mediaType of ["movie", "tv"]) {
-            const items = await fetchCatalogSlice({
+            let items = await fetchCatalogSlice({
               tmdbGet,
               region,
               language,
@@ -546,6 +582,12 @@ export async function generateCatalogFeed(configuration, dependencies = {}) {
               concurrency: configuration.concurrency,
               warnings,
             });
+            const sliceKey = `${providerGroup.provider.id}:${mediaType}`;
+            if (language === fallbackLanguage) {
+              fallbackSlices.set(sliceKey, items);
+            } else if (fallbackLanguage) {
+              items = mergeLocalizedItems(items, fallbackSlices.get(sliceKey) ?? []);
+            }
             statistics.slices += 1;
             statistics.titles += items.length;
             statistics.withPosters += items.filter((item) => item.posterPath).length;
