@@ -1,5 +1,5 @@
 export type MediaType = "movie" | "tv";
-export type AppView = "discover" | "tastemaker" | "watchlist" | "additions" | "settings";
+export type AppView = "discover" | "hotline" | "tastemaker" | "watchlist" | "additions" | "settings";
 export type SearchMode = "name" | "tags" | "concept";
 export type CatalogSort = "popularity" | "rating" | "release-newest" | "release-oldest";
 
@@ -43,6 +43,7 @@ export interface CatalogItem {
   voteAverage: number;
   voteCount: number;
   popularity: number;
+  trendingRank?: number;
   semanticVector?: string;
   providerLinks: ProviderLink[];
   syncedAt: number;
@@ -73,4 +74,35 @@ export interface ProviderSlice {
   provider: Provider;
   mediaType: MediaType;
   items: CatalogItem[];
+}
+
+export interface HotlineEpisode {
+  key: string;
+  seriesTmdbId: number;
+  seriesTitle: string;
+  episodeTmdbId: number;
+  episodeName: string;
+  seasonNumber: number;
+  episodeNumber: number;
+  overview: string;
+  airDate: string;
+  stillPath: string | null;
+  seriesPosterPath: string | null;
+  seriesBackdropPath: string | null;
+  url: string;
+}
+
+export interface HotlineFeed {
+  generatedAt: number;
+  region: string;
+  language: string;
+  ranking: {
+    source: "tmdb-weekly-trending-then-popularity";
+    refreshedAt: number;
+  };
+  dropout: {
+    providerId: number;
+    favorites: Array<{ tmdbId: number; title: string }>;
+    episodes: HotlineEpisode[];
+  };
 }

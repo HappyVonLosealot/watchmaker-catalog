@@ -7,6 +7,13 @@ import {
   SEMANTIC_VECTOR_FORMAT,
 } from "./semantic-vectors.mjs";
 import { createDisneyLinkResolver } from "./disney-links.mjs";
+import {
+  attachTrendingRanks,
+  DROPOUT_HOTLINE_SHOWS,
+  fetchDropoutHotlineEpisodes,
+  fetchWeeklyTrendingRanks,
+  mergeLocalizedEpisodes,
+} from "./hotline-data.mjs";
 
 export const API_ROOT = "https://api.themoviedb.org/3";
 export const FEED_SCHEMA_VERSION = 2;
@@ -111,6 +118,10 @@ export function configurationFromEnvironment(environment = process.env) {
     semanticBatchSize: integer(environment.WATCHMAKER_SEMANTIC_BATCH_SIZE, 96, {
       min: 8,
       max: 256,
+    }),
+    trendingPageLimit: integer(environment.WATCHMAKER_TRENDING_PAGES, 20, {
+      min: 1,
+      max: 30,
     }),
   };
 }
@@ -543,13 +554,28 @@ export async function generateCatalogFeed(configuration, dependencies = {}) {
   const tmdbGet = dependencies.tmdbGet || createTmdbClient(configuration);
   const logger = dependencies.logger || console;
   const generatedAt = dependencies.generatedAt || Date.now();
+  const warnings = [];
   const disneyLinkResolver =
     dependencies.disneyLinkResolver || createDisneyLinkResolver();
+  let trendingRanks = dependencies.trendingRanks;
+  if (!trendingRanks) {
+    try {
+      trendingRanks = await fetchWeeklyTrendingRanks(tmdbGet, {
+        pageLimit: configuration.trendingPageLimit,
+        concurrency: configuration.concurrency,
+      });
+    } catch (error) {
+      warnings.push(
+        `Could not refresh weekly TMDb trend ranks; popularity ordering was used instead ` +
+          `(${error instanceof Error ? error.message : error}).`,
+      );
+      trendingRanks = { movie: new Map(), tv: new Map() };
+    }
+  }
   const semanticEncoder =
     dependencies.semanticEncoder ||
     (await createSemanticEncoder({ batchSize: configuration.semanticBatchSize }));
   const buildingRoot = configuration.outputRoot + `.building-${process.pid}`;
-  const warnings = [];
   const statistics = {
     regions: 0,
     locales: 0,
@@ -559,6 +585,8 @@ export async function generateCatalogFeed(configuration, dependencies = {}) {
     withSemanticVectors: 0,
     withDirectDisneyLinks: 0,
     withDisneyHandoffs: 0,
+    withTrendingRanks: 0,
+    hotlineEpisodes: 0,
   };
 
   await rm(buildingRoot, { recursive: true, force: true });
@@ -575,6 +603,7 @@ export async function generateCatalogFeed(configuration, dependencies = {}) {
       statistics.regions += 1;
       manifestRegions.push({ code: region, languages: configuration.languages });
       const fallbackSlices = new Map();
+      let fallbackHotlineEpisodes = [];
       for (const language of generationLanguages) {
         statistics.locales += 1;
         logger.log(`Generating ${region}/${language}`);
@@ -583,6 +612,7 @@ export async function generateCatalogFeed(configuration, dependencies = {}) {
           fetchGenres(tmdbGet, language),
         ]);
         const providers = providerGroups.map((group) => group.provider);
+        let dropoutCatalogItems = [];
         await writeJson(buildingRoot, `${region}/${language}/providers.json`, {
           schemaVersion: FEED_SCHEMA_VERSION,
           generatedAt,
@@ -613,6 +643,7 @@ export async function generateCatalogFeed(configuration, dependencies = {}) {
             } else if (fallbackLanguage) {
               items = mergeLocalizedItems(items, fallbackSlices.get(sliceKey) ?? []);
             }
+            items = attachTrendingRanks(items, mediaType, trendingRanks);
             if (providerGroup.provider.id === 337) {
               const linked = await disneyLinkResolver.attach(items, {
                 mediaType,
@@ -625,10 +656,14 @@ export async function generateCatalogFeed(configuration, dependencies = {}) {
               warnings.push(...linked.warnings);
             }
             items = await semanticEncoder.attach(items);
+            if (providerGroup.provider.id === DROPOUT_PROVIDER.id && mediaType === "tv") {
+              dropoutCatalogItems = items;
+            }
             statistics.slices += 1;
             statistics.titles += items.length;
             statistics.withPosters += items.filter((item) => item.posterPath).length;
             statistics.withSemanticVectors += items.filter((item) => item.semanticVector).length;
+            statistics.withTrendingRanks += items.filter((item) => item.trendingRank).length;
             await writeJson(
               buildingRoot,
               `${region}/${language}/${providerGroup.provider.id}/${mediaType}.json`,
@@ -645,6 +680,43 @@ export async function generateCatalogFeed(configuration, dependencies = {}) {
             );
           }
         }
+
+        const hotlineResult = dependencies.dropoutHotlineFetcher
+          ? await dependencies.dropoutHotlineFetcher({
+              tmdbGet,
+              catalogItems: dropoutCatalogItems,
+              language,
+              generatedAt,
+            })
+          : await fetchDropoutHotlineEpisodes({
+              tmdbGet,
+              catalogItems: dropoutCatalogItems,
+              language,
+              generatedAt,
+            });
+        let dropoutEpisodes = hotlineResult.episodes;
+        if (language === fallbackLanguage) {
+          fallbackHotlineEpisodes = dropoutEpisodes;
+        } else if (fallbackLanguage) {
+          dropoutEpisodes = mergeLocalizedEpisodes(dropoutEpisodes, fallbackHotlineEpisodes);
+        }
+        warnings.push(...hotlineResult.warnings);
+        statistics.hotlineEpisodes += dropoutEpisodes.length;
+        await writeJson(buildingRoot, `${region}/${language}/hotline.json`, {
+          schemaVersion: FEED_SCHEMA_VERSION,
+          generatedAt,
+          region,
+          language,
+          ranking: {
+            source: "tmdb-weekly-trending-then-popularity",
+            refreshedAt: generatedAt,
+          },
+          dropout: {
+            providerId: DROPOUT_PROVIDER.id,
+            favorites: DROPOUT_HOTLINE_SHOWS,
+            episodes: dropoutEpisodes,
+          },
+        });
       }
     }
 

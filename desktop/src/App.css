@@ -168,6 +168,54 @@ select { cursor: pointer; }
 .card-actions { display: flex; gap: 5px; margin-top: 10px; opacity: 0; transform: translateY(3px); transition: .18s; }
 .media-card:hover .card-actions, .icon-button.selected { opacity: 1; transform: none; }
 
+/* Hotline */
+.hotline-view { overflow: hidden; background: radial-gradient(circle at 84% 2%, rgba(212,67,49,.11), transparent 25%); }
+.hotline-header { align-items: center; }
+.hotline-header .eyebrow { color: #f18b6f; }
+.hotline-status { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 11px 14px; border: 1px solid rgba(231,130,120,.2); border-radius: 12px; color: #f09a82; background: rgba(212,67,49,.065); }
+.hotline-status > svg { width: 23px; height: 23px; }
+.hotline-status span { display: flex; flex-direction: column; }
+.hotline-status strong { color: #f1c0b3; font-size: .72rem; }
+.hotline-status small { margin-top: 2px; color: #9e7770; font-size: .62rem; }
+.hotline-stack { display: grid; gap: 39px; }
+.hotline-section { min-width: 0; }
+.hotline-section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; margin-bottom: 14px; }
+.hotline-section-heading h2 { margin: 0; font-family: Georgia, serif; font-size: 1.48rem; font-weight: 500; }
+.hotline-section-heading p { margin: 5px 0 0; color: var(--muted); font-size: .72rem; }
+.hotline-rail-controls { flex: 0 0 auto; display: flex; gap: 6px; }
+.hotline-rail-controls button { width: 34px; height: 34px; display: grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 50%; color: var(--muted-strong); background: var(--panel); cursor: pointer; }
+.hotline-rail-controls button:hover { color: var(--gold-bright); border-color: rgba(216,173,87,.35); background: var(--gold-soft); }
+.hotline-rail-controls button:first-child svg { transform: rotate(180deg); }
+.hotline-rail-controls svg { width: 17px; }
+.hotline-track { display: flex; gap: 13px; padding: 1px 1px 9px; overflow-x: auto; overscroll-behavior-inline: contain; scroll-behavior: smooth; scroll-snap-type: x mandatory; scrollbar-width: thin; scrollbar-color: rgba(216,173,87,.28) transparent; }
+.hotline-track::-webkit-scrollbar { height: 5px; }
+.hotline-track::-webkit-scrollbar-thumb { border-radius: 99px; background: rgba(216,173,87,.28); }
+.hotline-title-card { width: 172px; flex: 0 0 172px; min-width: 0; scroll-snap-align: start; }
+.hotline-poster { position: relative; width: 100%; aspect-ratio: 2 / 3; display: block; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 11px; background: var(--panel-soft); cursor: pointer; box-shadow: 0 13px 27px rgba(0,0,0,.24); }
+.hotline-poster > img, .hotline-poster > .poster-fallback { width: 100%; height: 100%; object-fit: cover; transition: transform .25s ease; }
+.hotline-poster:hover > img { transform: scale(1.025); }
+.hotline-rank { position: absolute; z-index: 1; top: 8px; left: 8px; padding: 5px 7px; border: 1px solid rgba(255,255,255,.16); border-radius: 6px; color: #fff; background: rgba(9,10,13,.78); backdrop-filter: blur(8px); font-size: .55rem; font-weight: 850; letter-spacing: .07em; }
+.hotline-rank.weekly { color: #ffd4c8; border-color: rgba(240,118,84,.36); background: rgba(104,28,18,.78); }
+.hotline-card-copy, .hotline-episode-copy { width: 100%; display: block; padding: 9px 3px 0; border: 0; color: inherit; background: transparent; cursor: pointer; text-align: left; }
+.hotline-card-copy strong, .hotline-card-copy span { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.hotline-card-copy strong { font-size: .82rem; }
+.hotline-card-copy span { margin-top: 4px; color: var(--muted); font-size: .63rem; }
+.hotline-episode-card { width: 330px; flex: 0 0 330px; min-width: 0; scroll-snap-align: start; }
+.hotline-episode-art { position: relative; width: 100%; aspect-ratio: 16 / 9; display: block; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 11px; background: var(--panel-soft); cursor: pointer; box-shadow: 0 13px 27px rgba(0,0,0,.24); }
+.hotline-episode-art img, .hotline-episode-fallback { width: 100%; height: 100%; object-fit: cover; transition: transform .25s ease; }
+.hotline-episode-art:hover img { transform: scale(1.025); }
+.hotline-episode-fallback { display: grid; place-items: center; color: rgba(216,173,87,.5); background: radial-gradient(circle at 35% 25%, rgba(216,173,87,.13), transparent 42%), #151820; font-family: Georgia, serif; font-size: 3rem; }
+.hotline-episode-code, .hotline-external { position: absolute; z-index: 1; top: 9px; border: 1px solid rgba(255,255,255,.17); color: #fff; background: rgba(7,8,11,.78); backdrop-filter: blur(8px); }
+.hotline-episode-code { left: 9px; padding: 5px 7px; border-radius: 6px; font-size: .57rem; font-weight: 800; letter-spacing: .08em; }
+.hotline-external { right: 9px; width: 29px; height: 29px; display: grid; place-items: center; border-radius: 50%; }
+.hotline-external svg { width: 14px; }
+.hotline-episode-copy > span, .hotline-episode-copy > strong { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.hotline-episode-copy > span { color: #e9957d; font-size: .61rem; font-weight: 780; letter-spacing: .04em; }
+.hotline-episode-copy > strong { margin-top: 5px; font-size: .85rem; }
+.hotline-episode-copy > p { min-height: 32px; display: -webkit-box; margin: 5px 0 0; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; color: var(--muted); font-size: .66rem; line-height: 1.45; }
+.hotline-inline-empty { min-height: 258px; min-width: min(460px, 90%); display: grid; place-items: center; padding: 25px; border: 1px dashed var(--line-strong); border-radius: 11px; color: var(--muted); background: rgba(255,255,255,.012); text-align: center; font-size: .75rem; }
+.hotline-inline-empty.wide { min-height: 186px; }
+
 /* Modal */
 .modal-layer { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; padding: 30px; background: rgba(3,4,6,.82); backdrop-filter: blur(13px); }
 .detail-modal { width: min(1010px, 94vw); max-height: 92vh; overflow: auto; border: 1px solid var(--line-strong); border-radius: 18px; background: #111319; box-shadow: 0 35px 110px rgba(0,0,0,.65); }
@@ -349,4 +397,8 @@ select { cursor: pointer; }
   .taste-builder { grid-template-columns: 1fr; }
   .seed-tray { border-left: 0; border-top: 1px solid var(--line); }
   .added-sites-grid { grid-template-columns: 1fr; }
+  .hotline-header { align-items: flex-start; }
+  .hotline-status { display: none; }
+  .hotline-title-card { width: 150px; flex-basis: 150px; }
+  .hotline-episode-card { width: 285px; flex-basis: 285px; }
 }

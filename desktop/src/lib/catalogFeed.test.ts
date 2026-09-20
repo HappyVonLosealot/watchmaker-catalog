@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   catalogSliceFeedPath,
+  fetchHotlineFeed,
   fetchProviderCatalog,
   fetchProviders,
+  hotlineFeedPath,
   providerFeedPath,
 } from "./catalogFeed";
 import type { CatalogItem, Provider } from "../types";
@@ -29,6 +31,7 @@ const item: CatalogItem = {
   voteAverage: 8,
   voteCount: 100,
   popularity: 12,
+  trendingRank: 3,
   providerLinks: [{ providerId: 8, providerName: "Netflix" }],
   syncedAt: 1,
 };
@@ -40,6 +43,7 @@ describe("publisher-managed catalogue feed", () => {
     expect(providerFeedPath("TR", "en-US")).toBe("TR/en-US/providers.json");
     expect(catalogSliceFeedPath({ region: "TR", language: "en-US" }, 8, "tv"))
       .toBe("TR/en-US/8/tv.json");
+    expect(hotlineFeedPath("TR", "en-US")).toBe("TR/en-US/hotline.json");
     expect(() => providerFeedPath("turkey", "en-US")).toThrow("Invalid catalogue region");
   });
 
@@ -212,5 +216,94 @@ describe("publisher-managed catalogue feed", () => {
 
     await expect(fetchProviders("TR", "en-US", undefined, "https://catalog.example/v1"))
       .rejects.toThrow("wrong region or language");
+  });
+
+  it("loads and validates the Dropout Hotline episode feed", async () => {
+    const hotline = {
+      schemaVersion: 2,
+      generatedAt: 100,
+      region: "TR",
+      language: "en-US",
+      ranking: { source: "tmdb-weekly-trending-then-popularity", refreshedAt: 100 },
+      dropout: {
+        providerId: -101,
+        favorites: [
+          { tmdbId: 89180, title: "Dimension 20" },
+          { tmdbId: 129412, title: "Game Changer" },
+          { tmdbId: 204031, title: "Make Some Noise" },
+          { tmdbId: 250251, title: "Smartypants" },
+        ],
+        episodes: [{
+          key: "dropout:89180:44",
+          seriesTmdbId: 89180,
+          seriesTitle: "Dimension 20",
+          episodeTmdbId: 44,
+          episodeName: "A New Quest",
+          seasonNumber: 3,
+          episodeNumber: 1,
+          overview: "The party meets.",
+          airDate: "2026-09-01",
+          stillPath: "/still.jpg",
+          seriesPosterPath: "/poster.jpg",
+          seriesBackdropPath: null,
+          url: "https://watch.dropout.tv/search?q=Dimension%2020%20A%20New%20Quest",
+        }],
+      },
+    };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(hotline), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    })));
+
+    const result = await fetchHotlineFeed(
+      { region: "TR", language: "en-US" },
+      undefined,
+      "https://catalog.example/v1",
+    );
+    expect(result.dropout.episodes[0].episodeName).toBe("A New Quest");
+  });
+
+  it("rejects a Hotline episode that points outside Dropout", async () => {
+    const unsafe = {
+      schemaVersion: 2,
+      generatedAt: 100,
+      region: "TR",
+      language: "en-US",
+      ranking: { source: "tmdb-weekly-trending-then-popularity", refreshedAt: 100 },
+      dropout: {
+        providerId: -101,
+        favorites: [
+          { tmdbId: 89180, title: "Dimension 20" },
+          { tmdbId: 129412, title: "Game Changer" },
+          { tmdbId: 204031, title: "Make Some Noise" },
+          { tmdbId: 250251, title: "Smartypants" },
+        ],
+        episodes: [{
+          key: "dropout:89180:44",
+          seriesTmdbId: 89180,
+          seriesTitle: "Dimension 20",
+          episodeTmdbId: 44,
+          episodeName: "A New Quest",
+          seasonNumber: 3,
+          episodeNumber: 1,
+          overview: "",
+          airDate: "2026-09-01",
+          stillPath: null,
+          seriesPosterPath: null,
+          seriesBackdropPath: null,
+          url: "https://malicious.example/search?q=Dimension%2020",
+        }],
+      },
+    };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(unsafe), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    })));
+
+    await expect(fetchHotlineFeed(
+      { region: "TR", language: "en-US" },
+      undefined,
+      "https://catalog.example/v1",
+    )).rejects.toThrow("invalid Dropout episode");
   });
 });

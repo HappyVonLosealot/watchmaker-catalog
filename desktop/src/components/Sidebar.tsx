@@ -3,6 +3,7 @@ import { formatSyncTime } from "../lib/format";
 import {
   BookmarkIcon,
   CompassIcon,
+  FlameIcon,
   GlobeIcon,
   RefreshIcon,
   SettingsIcon,
@@ -21,6 +22,7 @@ interface SidebarProps {
 
 const navigation = [
   { id: "discover" as const, label: "Discover", icon: CompassIcon },
+  { id: "hotline" as const, label: "Hotline", icon: FlameIcon },
   { id: "tastemaker" as const, label: "Tastemaker", icon: SparklesIcon },
   { id: "watchlist" as const, label: "Watchlist", icon: BookmarkIcon },
   { id: "additions" as const, label: "Addition", icon: GlobeIcon },

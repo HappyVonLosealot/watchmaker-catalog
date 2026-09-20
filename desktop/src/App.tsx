@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
-import type { AppSettings, AppView, CatalogItem, CustomSite, SyncProgress, TasteSignal } from "./types";
+import type {
+  AppSettings,
+  AppView,
+  CatalogItem,
+  CustomSite,
+  HotlineFeed,
+  SyncProgress,
+  TasteSignal,
+} from "./types";
 import { clearCatalog, getCatalog, getMeta, retainCatalogProviders } from "./lib/catalogDb";
 import {
   loadSettings,
@@ -10,7 +18,7 @@ import {
   saveTasteSignals,
   saveWatchlist,
 } from "./lib/settings";
-import { LAST_SYNC_META_KEY, syncCatalog } from "./lib/sync";
+import { HOTLINE_META_KEY, LAST_SYNC_META_KEY, syncCatalog } from "./lib/sync";
 import { Sidebar } from "./components/Sidebar";
 import { DetailModal } from "./components/DetailModal";
 import { DiscoverView } from "./views/DiscoverView";
@@ -18,6 +26,7 @@ import { TastemakerView } from "./views/TastemakerView";
 import { WatchlistView } from "./views/WatchlistView";
 import { SettingsView } from "./views/SettingsView";
 import { AdditionsView } from "./views/AdditionsView";
+import { HotlineView } from "./views/HotlineView";
 
 const INITIAL_SYNC: SyncProgress = {
   state: "idle",
@@ -34,6 +43,7 @@ function isConfigured(settings: AppSettings): boolean {
 export default function App() {
   const [settings, setSettingsState] = useState(loadSettings);
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
+  const [hotline, setHotline] = useState<HotlineFeed | null>(null);
   const [currentView, setCurrentView] = useState<AppView>(() =>
     isConfigured(loadSettings()) ? "discover" : "settings",
   );
@@ -59,6 +69,7 @@ export default function App() {
             lastSuccessfulSync: progress.lastSuccessfulSync ?? current.lastSuccessfulSync,
           })),
         onCatalogUpdated: (nextCatalog) => mountedRef.current && setCatalog(nextCatalog),
+        onHotlineUpdated: (nextHotline) => mountedRef.current && setHotline(nextHotline),
       },
       controller.signal,
     );
@@ -70,10 +81,20 @@ export default function App() {
     const loadSelectedCatalog = retainCatalogProviders(
       initialSettings.selectedProviders.map((provider) => provider.id),
     ).then(getCatalog);
-    void Promise.all([loadSelectedCatalog, getMeta<number>(LAST_SYNC_META_KEY)]).then(
-      ([savedCatalog, lastSync]) => {
+    void Promise.all([
+      loadSelectedCatalog,
+      getMeta<number>(LAST_SYNC_META_KEY),
+      getMeta<HotlineFeed>(HOTLINE_META_KEY),
+    ]).then(
+      ([savedCatalog, lastSync, savedHotline]) => {
         if (!mountedRef.current) return;
         setCatalog(savedCatalog);
+        setHotline(
+          savedHotline?.region === initialSettings.region &&
+          savedHotline.language === initialSettings.language
+            ? savedHotline
+            : null,
+        );
         setSync((current) => ({
           ...current,
           label: savedCatalog.length ? "Saved catalogue loaded" : current.label,
@@ -94,6 +115,11 @@ export default function App() {
     setSettingsState(nextSettings);
     await retainCatalogProviders(nextSettings.selectedProviders.map((provider) => provider.id));
     setCatalog(await getCatalog());
+    setHotline((current) =>
+      current?.region === nextSettings.region && current.language === nextSettings.language
+        ? current
+        : null,
+    );
     setCurrentView("discover");
     beginSync(nextSettings);
   };
@@ -122,6 +148,7 @@ export default function App() {
     abortRef.current?.abort();
     await clearCatalog();
     setCatalog([]);
+    setHotline(null);
     setSync({ ...INITIAL_SYNC, label: "Local catalogue cleared" });
   };
 
@@ -157,6 +184,14 @@ export default function App() {
             providers={settings.selectedProviders}
             configured={isConfigured(settings)}
             onSettings={() => setCurrentView("settings")}
+          />
+        )}
+        {currentView === "hotline" && (
+          <HotlineView
+            catalog={catalog}
+            providers={settings.selectedProviders}
+            hotline={hotline}
+            onOpen={setSelectedItem}
           />
         )}
         {currentView === "tastemaker" && (

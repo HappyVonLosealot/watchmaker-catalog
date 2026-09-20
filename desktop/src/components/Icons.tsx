@@ -27,6 +27,9 @@ export const CompassIcon = (props: IconProps) => (
 export const SparklesIcon = (props: IconProps) => (
   <IconBase {...props}><path d="m12 3 1.2 3.8L17 8l-3.8 1.2L12 13l-1.2-3.8L7 8l3.8-1.2L12 3Z" /><path d="m18.5 14 .7 2.3 2.3.7-2.3.7-.7 2.3-.7-2.3-2.3-.7 2.3-.7.7-2.3Z" /><path d="m5 13 .8 2.2L8 16l-2.2.8L5 19l-.8-2.2L2 16l2.2-.8L5 13Z" /></IconBase>
 );
+export const FlameIcon = (props: IconProps) => (
+  <IconBase {...props}><path d="M13.5 2.5c.7 3.8-2.4 5-2.4 7.8 0 1.2.8 2.1 1.9 2.1 1.8 0 2.8-1.8 2.5-3.6 2.5 1.8 4 4.1 4 6.6A7.5 7.5 0 0 1 4.5 15c0-3 1.7-5.8 4.7-8.2-.2 2.4.8 3.4 1.7 3.5-.3-3.2.5-5.7 2.6-7.8Z" /><path d="M9.2 20.8c-1.1-2.4-.2-4.5 2.2-6.3-.1 1.8.7 2.6 1.6 2.6 1.1 0 1.8-1.1 1.6-2.3 1.4 1.3 1.8 3.8.2 6" /></IconBase>
+);
 export const BookmarkIcon = (props: IconProps) => (
   <IconBase {...props}><path d="M6.5 4.5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v17l-5.5-3.7-5.5 3.7v-17Z" /></IconBase>
 );

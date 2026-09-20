@@ -8,6 +8,8 @@ const imagePathPattern = /^\/[A-Za-z0-9._/-]+$/;
 const localePattern = /^[a-z]{2}-[A-Z]{2}$/;
 const regionPattern = /^[A-Z]{2}$/;
 const semanticVectorPattern = /^[A-Za-z0-9+/]{512}$/;
+const airDatePattern = /^\d{4}-\d{2}-\d{2}$/;
+const dropoutFavoriteIds = new Set([89180, 129412, 204031, 250251]);
 const errors = [];
 const warnings = [];
 let fileCount = 0;
@@ -17,6 +19,8 @@ let posterCount = 0;
 let semanticVectorCount = 0;
 let directDisneyLinkCount = 0;
 let disneyHandoffCount = 0;
+let trendingRankCount = 0;
+let hotlineEpisodeCount = 0;
 
 function fail(location, message) {
   errors.push(`${location}: ${message}`);
@@ -75,6 +79,13 @@ function validateItem(item, mediaType, provider, region, language, location, see
   if (!Number.isSafeInteger(item?.voteCount) || item.voteCount < 0) {
     fail(location, "voteCount must be a non-negative integer");
   }
+  if (item?.trendingRank !== undefined) {
+    if (!Number.isSafeInteger(item.trendingRank) || item.trendingRank < 1) {
+      fail(location, "trendingRank must be a positive safe integer");
+    } else {
+      trendingRankCount += 1;
+    }
+  }
   if (!Array.isArray(item?.providerLinks) || item.providerLinks.length !== 1) {
     fail(location, "a provider slice item must contain exactly one provider link");
   } else {
@@ -104,6 +115,101 @@ function validateItem(item, mediaType, provider, region, language, location, see
   } else {
     semanticVectorCount += 1;
   }
+}
+
+function isSafeDropoutSearchUrl(value) {
+  if (typeof value !== "string") return false;
+  try {
+    const parsed = new URL(value);
+    return (
+      parsed.protocol === "https:" &&
+      parsed.hostname === "watch.dropout.tv" &&
+      parsed.pathname === "/search" &&
+      !parsed.username &&
+      !parsed.password &&
+      !parsed.hash &&
+      [...parsed.searchParams.keys()].length === 1 &&
+      Boolean(parsed.searchParams.get("q")?.trim())
+    );
+  } catch {
+    return false;
+  }
+}
+
+function validateHotline(hotline, region, language, location) {
+  if (hotline?.schemaVersion !== FEED_SCHEMA_VERSION) {
+    fail(location, `expected schema version ${FEED_SCHEMA_VERSION}`);
+  }
+  if (hotline?.region !== region || hotline?.language !== language) {
+    fail(location, "region or language metadata does not match its path");
+  }
+  if (!Number.isFinite(hotline?.generatedAt) || !Number.isFinite(hotline?.ranking?.refreshedAt)) {
+    fail(location, "generation or trend refresh timestamp is invalid");
+  }
+  if (hotline?.ranking?.source !== "tmdb-weekly-trending-then-popularity") {
+    fail(location, "ranking source is invalid");
+  }
+  if (hotline?.dropout?.providerId !== -101) fail(location, "Dropout provider id is invalid");
+  if (!Array.isArray(hotline?.dropout?.favorites)) {
+    fail(location, "Dropout favorites must be an array");
+  } else {
+    const favorites = new Set();
+    for (const favorite of hotline.dropout.favorites) {
+      if (
+        !Number.isSafeInteger(favorite?.tmdbId) ||
+        !dropoutFavoriteIds.has(favorite.tmdbId) ||
+        typeof favorite?.title !== "string" ||
+        !favorite.title.trim() ||
+        favorites.has(favorite.tmdbId)
+      ) {
+        fail(location, "Dropout favorites contain an invalid or duplicate show");
+      }
+      favorites.add(favorite?.tmdbId);
+    }
+    if (favorites.size !== dropoutFavoriteIds.size) {
+      fail(location, "Dropout favorites do not contain all four configured shows");
+    }
+  }
+  if (!Array.isArray(hotline?.dropout?.episodes)) {
+    fail(location, "Dropout episodes must be an array");
+    return;
+  }
+  if (hotline.dropout.episodes.length > 100) fail(location, "too many Dropout episodes");
+  const keys = new Set();
+  hotline.dropout.episodes.forEach((episode, index) => {
+    const episodeLocation = `${location}#dropout.episodes.${index}`;
+    hotlineEpisodeCount += 1;
+    if (
+      !Number.isSafeInteger(episode?.seriesTmdbId) ||
+      !dropoutFavoriteIds.has(episode.seriesTmdbId) ||
+      !Number.isSafeInteger(episode?.episodeTmdbId) ||
+      episode?.key !== `dropout:${episode?.seriesTmdbId}:${episode?.episodeTmdbId}`
+    ) {
+      fail(episodeLocation, "episode identity is invalid");
+    }
+    if (keys.has(episode?.key)) fail(episodeLocation, "duplicate episode key");
+    keys.add(episode?.key);
+    if (typeof episode?.seriesTitle !== "string" || !episode.seriesTitle.trim()) {
+      fail(episodeLocation, "series title is missing");
+    }
+    if (typeof episode?.episodeName !== "string" || !episode.episodeName.trim()) {
+      fail(episodeLocation, "episode name is missing");
+    }
+    if (typeof episode?.overview !== "string") fail(episodeLocation, "overview must be a string");
+    if (!Number.isSafeInteger(episode?.seasonNumber) || episode.seasonNumber < 0) {
+      fail(episodeLocation, "season number is invalid");
+    }
+    if (!Number.isSafeInteger(episode?.episodeNumber) || episode.episodeNumber < 0) {
+      fail(episodeLocation, "episode number is invalid");
+    }
+    if (!airDatePattern.test(episode?.airDate || "")) fail(episodeLocation, "air date is invalid");
+    for (const field of ["stillPath", "seriesPosterPath", "seriesBackdropPath"]) {
+      if (episode?.[field] !== null && !imagePathPattern.test(episode?.[field] || "")) {
+        fail(episodeLocation, `${field} is unsafe`);
+      }
+    }
+    if (!isSafeDropoutSearchUrl(episode?.url)) fail(episodeLocation, "Dropout search URL is unsafe");
+  });
 }
 
 const rootInfo = await stat(root).catch(() => null);
@@ -186,6 +292,9 @@ for (const regionEntry of manifest.regions || []) {
         );
       }
     }
+    const hotlinePath = `${region}/${language}/hotline.json`;
+    const hotline = await json(hotlinePath);
+    if (hotline) validateHotline(hotline, region, language, hotlinePath);
   }
 }
 
@@ -231,6 +340,20 @@ if (manifest.statistics) {
         `validated ${disneyHandoffCount}`,
     );
   }
+  if (manifest.statistics.withTrendingRanks !== trendingRankCount) {
+    fail(
+      "manifest.json",
+      `statistics.withTrendingRanks says ${manifest.statistics.withTrendingRanks}, ` +
+        `validated ${trendingRankCount}`,
+    );
+  }
+  if (manifest.statistics.hotlineEpisodes !== hotlineEpisodeCount) {
+    fail(
+      "manifest.json",
+      `statistics.hotlineEpisodes says ${manifest.statistics.hotlineEpisodes}, ` +
+        `validated ${hotlineEpisodeCount}`,
+    );
+  }
 }
 
 if (warnings.length > 0) warnings.forEach((warning) => console.warn("Warning: " + warning));
@@ -244,6 +367,8 @@ if (errors.length > 0) {
       `${titleCount.toLocaleString()} provider-title records ` +
       `(${posterCount.toLocaleString()} with posters, ` +
       `${semanticVectorCount.toLocaleString()} with semantic fingerprints, ` +
+      `${trendingRankCount.toLocaleString()} with weekly trend ranks, ` +
+      `${hotlineEpisodeCount.toLocaleString()} Hotline episodes, ` +
       `${directDisneyLinkCount.toLocaleString()} direct Disney+ links).`,
   );
 }

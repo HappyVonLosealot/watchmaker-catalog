@@ -9,10 +9,14 @@ This repository builds the public, read-only catalogue used by the **Watchmaker*
 - Subscription (`flatrate`) availability only—rentals and purchases are excluded
 - Titles, descriptions, genres, ratings, release dates, provider links, and TMDb thumbnail paths
 - Precomputed multilingual synopsis fingerprints for meaning-based TasteMaker matches
+- A Hotline page ranking subscription titles by TMDb's weekly trends, with popularity fallback
+- Latest aired episodes from Dimension 20, Game Changer, Make Some Noise, and Smartypants
 - Exact Disney+ title links resolved from free public Wikidata IDs when available
 - Turkish metadata with English fallback
 
-The generated files are published by GitHub Pages under `/v1`. Watchmaker downloads them only when the app starts; nothing runs in the background on the user's PC.
+The generated files are published by GitHub Pages under `/v1`. Watchmaker downloads them when the app starts and whenever **Update now** is selected; nothing runs in the background on the user's PC.
+
+Hotline trend ranks and Dropout episode metadata are refreshed by the same free daily catalogue build. Each desktop refresh pulls the newest published Hotline data, then stores it locally for instant offline reopening.
 
 TasteMaker's meaning fingerprints are generated during this free scheduled build with the Apache-2.0-licensed `paraphrase-multilingual-MiniLM-L12-v2` model. The desktop app downloads only compact int8 fingerprints and compares them locally. It runs no live AI model, calls no AI API, sends no viewing preference anywhere, and creates no cost for the user.
 

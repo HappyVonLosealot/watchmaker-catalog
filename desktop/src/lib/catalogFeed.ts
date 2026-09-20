@@ -1,14 +1,24 @@
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
-import type { AppSettings, CatalogItem, MediaType, Provider } from "../types";
+import type {
+  AppSettings,
+  CatalogItem,
+  HotlineEpisode,
+  HotlineFeed,
+  MediaType,
+  Provider,
+} from "../types";
 
 export const POSTER_ROOT = "https://image.tmdb.org/t/p/w500";
 export const BACKDROP_ROOT = "https://image.tmdb.org/t/p/w1280";
+export const STILL_ROOT = "https://image.tmdb.org/t/p/w780";
 export const PROVIDER_LOGO_ROOT = "https://image.tmdb.org/t/p/w92";
 const IMAGE_PATH = /^\/[A-Za-z0-9._/-]+$/;
 const SEMANTIC_VECTOR = /^[A-Za-z0-9+/]{512}$/;
 const DISNEY_ENTITY_PATH = /^\/[a-z]{2}-[a-z]{2}\/browse\/entity-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/?$/i;
 const DISNEY_LEGACY_PATH = /^\/[a-z]{2}-[a-z]{2}\/(movies|series)\/wd\/[A-Za-z0-9_-]{6,32}\/?$/;
 const MAX_SLICE_ITEMS = 100_000;
+const MAX_HOTLINE_EPISODES = 100;
+const DROPOUT_FAVORITE_IDS = new Set([89180, 129412, 204031, 250251]);
 
 const BUNDLED_FEED_ROOT = "/catalog/v1";
 const configuredFeedRoot = import.meta.env.VITE_WATCHMAKER_CATALOG_URL?.trim();
@@ -31,6 +41,10 @@ interface CatalogSliceResponse {
   provider: Provider;
   mediaType: MediaType;
   items: CatalogItem[];
+}
+
+interface HotlineResponse extends HotlineFeed {
+  schemaVersion: number;
 }
 
 export class CatalogFeedError extends Error {
@@ -63,6 +77,12 @@ export function catalogSliceFeedPath(
   const safeLanguage = cleanSegment(settings.language, /^[a-z]{2}-[A-Z]{2}$/, "catalogue language");
   if (!Number.isSafeInteger(providerId)) throw new Error("Invalid provider ID.");
   return `${safeRegion}/${safeLanguage}/${providerId}/${mediaType}.json`;
+}
+
+export function hotlineFeedPath(region: string, language: string): string {
+  const safeRegion = cleanSegment(region, /^[A-Z]{2}$/, "catalogue region");
+  const safeLanguage = cleanSegment(language, /^[a-z]{2}-[A-Z]{2}$/, "catalogue language");
+  return `${safeRegion}/${safeLanguage}/hotline.json`;
 }
 
 function feedUrl(path: string, root = CATALOG_FEED_ROOT): string {
@@ -167,6 +187,8 @@ function assertItem(
     !Number.isSafeInteger(item.voteCount) ||
     item.voteCount < 0 ||
     !Number.isFinite(item.popularity) ||
+    (item.trendingRank !== undefined &&
+      (!Number.isSafeInteger(item.trendingRank) || item.trendingRank < 1)) ||
     !Number.isFinite(item.syncedAt) ||
     !Array.isArray(item.providerLinks)
   ) {
@@ -194,6 +216,57 @@ function assertItem(
     (provider.id !== 337 || !isSafePublishedDisneyLink(linkUrl, item, region, language))
   ) {
     throw new Error("The catalogue feed returned an unsafe provider link.");
+  }
+}
+
+function isSafeDropoutEpisodeUrl(url: unknown): url is string {
+  if (typeof url !== "string") return false;
+  try {
+    const parsed = new URL(url);
+    return (
+      parsed.protocol === "https:" &&
+      parsed.hostname === "watch.dropout.tv" &&
+      parsed.pathname === "/search" &&
+      !parsed.username &&
+      !parsed.password &&
+      !parsed.hash &&
+      [...parsed.searchParams.keys()].length === 1 &&
+      Boolean(parsed.searchParams.get("q")?.trim())
+    );
+  } catch {
+    return false;
+  }
+}
+
+function assertHotlineEpisode(episode: HotlineEpisode): void {
+  if (
+    !Number.isSafeInteger(episode.seriesTmdbId) ||
+    !DROPOUT_FAVORITE_IDS.has(episode.seriesTmdbId) ||
+    !Number.isSafeInteger(episode.episodeTmdbId) ||
+    episode.key !== `dropout:${episode.seriesTmdbId}:${episode.episodeTmdbId}` ||
+    typeof episode.seriesTitle !== "string" ||
+    !episode.seriesTitle.trim() ||
+    typeof episode.episodeName !== "string" ||
+    !episode.episodeName.trim() ||
+    typeof episode.overview !== "string" ||
+    !Number.isSafeInteger(episode.seasonNumber) ||
+    episode.seasonNumber < 0 ||
+    !Number.isSafeInteger(episode.episodeNumber) ||
+    episode.episodeNumber < 0 ||
+    typeof episode.airDate !== "string" ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(episode.airDate) ||
+    !isSafeDropoutEpisodeUrl(episode.url)
+  ) {
+    throw new Error("The Hotline feed returned an invalid Dropout episode.");
+  }
+  for (const imagePath of [
+    episode.stillPath,
+    episode.seriesPosterPath,
+    episode.seriesBackdropPath,
+  ]) {
+    if (imagePath !== null && !IMAGE_PATH.test(imagePath)) {
+      throw new Error("The Hotline feed returned an unsafe episode artwork path.");
+    }
   }
 }
 
@@ -254,4 +327,56 @@ export async function fetchProviderCatalog(
       ? item.providerLinks
       : [{ providerId: response.provider.id, providerName: response.provider.name }],
   }));
+}
+
+export async function fetchHotlineFeed(
+  settings: Pick<AppSettings, "region" | "language">,
+  signal?: AbortSignal,
+  root?: string,
+): Promise<HotlineFeed> {
+  const response = await feedGet<HotlineResponse>(
+    hotlineFeedPath(settings.region, settings.language),
+    signal,
+    root,
+  );
+  if (
+    response.region !== settings.region ||
+    response.language !== settings.language ||
+    !Number.isFinite(response.generatedAt) ||
+    response.ranking?.source !== "tmdb-weekly-trending-then-popularity" ||
+    !Number.isFinite(response.ranking?.refreshedAt) ||
+    response.dropout?.providerId !== -101 ||
+    !Array.isArray(response.dropout?.favorites) ||
+    !Array.isArray(response.dropout?.episodes)
+  ) {
+    throw new Error("The Hotline feed returned mismatched or invalid metadata.");
+  }
+  const favoriteIds = new Set<number>();
+  for (const favorite of response.dropout.favorites) {
+    if (
+      !Number.isSafeInteger(favorite?.tmdbId) ||
+      !DROPOUT_FAVORITE_IDS.has(favorite.tmdbId) ||
+      typeof favorite?.title !== "string" ||
+      !favorite.title.trim() ||
+      favoriteIds.has(favorite.tmdbId)
+    ) {
+      throw new Error("The Hotline feed returned an invalid Dropout favorite.");
+    }
+    favoriteIds.add(favorite.tmdbId);
+  }
+  if (favoriteIds.size !== DROPOUT_FAVORITE_IDS.size) {
+    throw new Error("The Hotline feed is missing a Dropout favorite.");
+  }
+  if (response.dropout.episodes.length > MAX_HOTLINE_EPISODES) {
+    throw new Error("The Hotline feed returned too many Dropout episodes.");
+  }
+  const episodeKeys = new Set<string>();
+  response.dropout.episodes.forEach((episode) => {
+    assertHotlineEpisode(episode);
+    if (episodeKeys.has(episode.key)) {
+      throw new Error("The Hotline feed returned a duplicate Dropout episode.");
+    }
+    episodeKeys.add(episode.key);
+  });
+  return response;
 }
