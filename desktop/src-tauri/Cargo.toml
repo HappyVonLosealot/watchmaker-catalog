@@ -1,0 +1,38 @@
+[package]
+name = "watchmaker"
+version = "1.0.2"
+description = "Your subscription-only streaming catalogue and local taste guide"
+authors = ["Watchmaker"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "watchmaker_lib"
+crate-type = ["rlib"]
+
+[features]
+# Tauri uses this feature to serve the bundled frontend through its internal
+# production protocol. Without it, a release binary attempts to reach the
+# development server at localhost.
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-http = "2"
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+
+# Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true

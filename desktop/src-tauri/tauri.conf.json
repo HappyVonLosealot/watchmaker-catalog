@@ -1,0 +1,41 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Watchmaker",
+  "version": "1.0.2",
+  "identifier": "app.watchmaker.desktop",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Watchmaker",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1060,
+        "minHeight": 700,
+        "center": true,
+        "resizable": true,
+        "backgroundColor": "#0b0c10"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' https://happyvonlosealot.github.io; img-src 'self' asset: data: https://image.tmdb.org; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "shortDescription": "All your subscriptions. One local catalogue.",
+    "longDescription": "Watchmaker combines the catalogues of the streaming services you select, excludes rentals and purchases, and opens titles in your normal browser without ever accessing subscription credentials.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ]
+  }
+}
