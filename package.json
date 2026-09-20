@@ -5,6 +5,10 @@
   "type": "module",
   "scripts": {
     "generate": "node scripts/generate-catalog-feed.mjs",
-    "validate": "node scripts/validate-catalog-feed.mjs catalog-dist/v1"
+    "validate": "node scripts/validate-catalog-feed.mjs catalog-dist/v1",
+    "test": "node --test scripts/lib/*.test.mjs"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "3.7.2"
   }
 }

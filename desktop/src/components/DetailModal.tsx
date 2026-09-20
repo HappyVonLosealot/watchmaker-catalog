@@ -95,7 +95,7 @@ export function DetailModal({
               )}
               <div className="handoff-note">
                 <ShieldIcon />
-                <span>Opens the title search on the provider's website in your normal browser. Watchmaker cannot see its login, cookies, or password.</span>
+                <span>Opens the provider's own title search or browse screen in your normal browser. Watchmaker cannot see its login, cookies, or password.</span>
               </div>
             </div>
 

@@ -6,12 +6,14 @@ const root = path.resolve(process.argv[2] || process.env.WATCHMAKER_FEED_DIR || 
 const imagePathPattern = /^\/[A-Za-z0-9._/-]+$/;
 const localePattern = /^[a-z]{2}-[A-Z]{2}$/;
 const regionPattern = /^[A-Z]{2}$/;
+const semanticVectorPattern = /^[A-Za-z0-9+/]{512}$/;
 const errors = [];
 const warnings = [];
 let fileCount = 0;
 let sliceCount = 0;
 let titleCount = 0;
 let posterCount = 0;
+let semanticVectorCount = 0;
 
 function fail(location, message) {
   errors.push(`${location}: ${message}`);
@@ -81,6 +83,11 @@ function validateItem(item, mediaType, provider, location, seen) {
       fail(location, "generated provider links must not contain unverified URLs");
     }
   }
+  if (typeof item?.semanticVector !== "string" || !semanticVectorPattern.test(item.semanticVector)) {
+    fail(location, "semanticVector must be a 384-byte int8 base64 fingerprint");
+  } else {
+    semanticVectorCount += 1;
+  }
 }
 
 const rootInfo = await stat(root).catch(() => null);
@@ -100,6 +107,13 @@ if (!Array.isArray(manifest.monetizationTypes) ||
 }
 if (!Array.isArray(manifest.regions) || manifest.regions.length === 0) {
   fail("manifest.json", "regions list is empty");
+}
+if (
+  manifest.semanticMatching?.dimensions !== 384 ||
+  manifest.semanticMatching?.format !== "int8-base64-v1" ||
+  manifest.semanticMatching?.generatedAheadOfTime !== true
+) {
+  fail("manifest.json", "semantic matching metadata is missing or invalid");
 }
 
 for (const regionEntry of manifest.regions || []) {
@@ -180,6 +194,13 @@ if (manifest.statistics) {
   if (manifest.statistics.withPosters !== posterCount) {
     fail("manifest.json", `statistics.withPosters says ${manifest.statistics.withPosters}, validated ${posterCount}`);
   }
+  if (manifest.statistics.withSemanticVectors !== semanticVectorCount) {
+    fail(
+      "manifest.json",
+      `statistics.withSemanticVectors says ${manifest.statistics.withSemanticVectors}, ` +
+        `validated ${semanticVectorCount}`,
+    );
+  }
 }
 
 if (warnings.length > 0) warnings.forEach((warning) => console.warn("Warning: " + warning));
@@ -191,6 +212,7 @@ if (errors.length > 0) {
     `Validated ${fileCount.toLocaleString()} feed files, ` +
       `${sliceCount.toLocaleString()} catalogue slices and ` +
       `${titleCount.toLocaleString()} provider-title records ` +
-      `(${posterCount.toLocaleString()} with posters).`,
+      `(${posterCount.toLocaleString()} with posters, ` +
+      `${semanticVectorCount.toLocaleString()} with semantic fingerprints).`,
   );
 }

@@ -63,9 +63,9 @@ export function TastemakerView({
         <div>
           <span className="eyebrow">LOCAL RECOMMENDATION ENGINE</span>
           <h1>Tastemaker</h1>
-          <p className="header-copy">Give it up to five things you love. It reads their descriptions to find similar stories, subjects and moods, then recommends only titles included with your services.</p>
+          <p className="header-copy">Give it up to five things you love. Watchmaker compares the meaning of their full descriptions—plot, setting, relationships and tone—then recommends only titles included with your services.</p>
         </div>
-        <div className="zero-cost-badge"><SparklesIcon /><span><strong>On-device</strong><small>No paid AI calls</small></span></div>
+        <div className="zero-cost-badge"><SparklesIcon /><span><strong>Local matching</strong><small>No live or paid AI</small></span></div>
       </header>
 
       <section className="taste-builder">
@@ -112,7 +112,7 @@ export function TastemakerView({
       {seeds.length > 0 && (
         <section className="results-section">
           <div className="section-heading">
-            <div><h2>Made for this mood</h2><p>Ranked primarily by description likeness. Genres, format, era, ratings and your feedback only fine-tune the order.</p></div>
+            <div><h2>Made for this mood</h2><p>Whole-description meaning comes first. Genre and format guardrails stop a single shared word from creating a nonsense match.</p></div>
           </div>
           <MediaGrid
             items={matches}

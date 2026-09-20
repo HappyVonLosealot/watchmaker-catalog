@@ -7,25 +7,34 @@ function item(
   genreIds: number[],
   overview = "",
   mediaType: "movie" | "tv" = "movie",
+  details: Partial<Pick<CatalogItem, "title" | "genreNames" | "semanticVector">> = {},
 ): CatalogItem {
   return {
     key,
     tmdbId: Number(key.split(":")[1]),
     mediaType,
-    title: key,
+    title: details.title ?? key,
     originalTitle: key,
     overview,
     posterPath: null,
     backdropPath: null,
     releaseDate: "2024-01-01",
     genreIds,
-    genreNames: genreIds.map(String),
+    genreNames: details.genreNames ?? genreIds.map(String),
     voteAverage: 8,
     voteCount: 1000,
     popularity: 50,
     providerLinks: [{ providerId: 1, providerName: "Service" }],
     syncedAt: 1,
+    semanticVector: details.semanticVector,
   };
+}
+
+function semanticVector(first: number, second = 0): string {
+  const bytes = new Uint8Array(384);
+  bytes[0] = first & 0xff;
+  bytes[1] = second & 0xff;
+  return btoa(String.fromCharCode(...bytes));
 }
 
 describe("Tastemaker", () => {
@@ -63,6 +72,69 @@ describe("Tastemaker", () => {
     const unrelated = item("movie:3", [27], "A haunted painting torments an isolated collector.");
 
     expect(tasteScore(related, [seed])).toBeGreaterThan(tasteScore(unrelated, [seed]));
+  });
+
+  it("uses whole-synopsis meaning and format guardrails instead of one shared word", () => {
+    const seed = item(
+      "tv:66732",
+      [10759, 9648, 10765],
+      "When a young boy vanishes, a small town uncovers secret experiments and supernatural forces.",
+      "tv",
+      {
+        title: "Stranger Things",
+        genreNames: ["Action & Adventure", "Mystery", "Sci-Fi & Fantasy"],
+        semanticVector: semanticVector(127),
+      },
+    );
+    const dark = item(
+      "tv:70523",
+      [80, 18, 10765, 9648],
+      "A missing child sends four families into a mystery spanning generations.",
+      "tv",
+      {
+        title: "Dark",
+        genreNames: ["Crime", "Drama", "Sci-Fi & Fantasy", "Mystery"],
+        semanticVector: semanticVector(124, 18),
+      },
+    );
+    const encanto = item(
+      "movie:568124",
+      [16, 35, 10751, 14],
+      "A magical family in Colombia depends on the one child without a gift.",
+      "movie",
+      {
+        title: "Encanto",
+        genreNames: ["Animation", "Comedy", "Family", "Fantasy"],
+        semanticVector: semanticVector(48, 112),
+      },
+    );
+
+    const ranked = rankTasteMatches([encanto, dark], [seed]);
+    expect(ranked[0]?.title).toBe("Dark");
+    expect(ranked.map((entry) => entry.title)).not.toContain("Encanto");
+    expect(recommendationReason(dark, [seed])).toMatch(/overall story, setting and tone/i);
+  });
+
+  it("keeps a genuine animated franchise match despite the animation guardrail", () => {
+    const seed = item("tv:1", [9648], "A supernatural mystery in Hawkins.", "tv", {
+      title: "Stranger Things",
+      genreNames: ["Mystery", "Sci-Fi & Fantasy"],
+      semanticVector: semanticVector(127),
+    });
+    const sequel = item("tv:2", [16, 9648], "Hawkins faces fresh mysteries in 1985.", "tv", {
+      title: "Stranger Things: Tales from '85",
+      genreNames: ["Animation", "Mystery", "Sci-Fi & Fantasy"],
+      semanticVector: semanticVector(125, 12),
+    });
+    const unrelatedAnimation = item("tv:3", [16], "A cheerful animated family adventure.", "tv", {
+      title: "Happy House",
+      genreNames: ["Animation", "Comedy", "Family"],
+      semanticVector: semanticVector(90, 75),
+    });
+
+    expect(rankTasteMatches([unrelatedAnimation, sequel], [seed])[0]?.title).toBe(
+      "Stranger Things: Tales from '85",
+    );
   });
 
   it("never recommends a seed or a locally disliked title", () => {

@@ -1,2 +1,4 @@
 catalog-dist/
+.cache/
+desktop/dist/
 node_modules/

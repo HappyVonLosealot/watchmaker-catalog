@@ -1,6 +1,6 @@
 [package]
 name = "watchmaker"
-version = "1.0.2"
+version = "1.0.3"
 description = "Your subscription-only streaming catalogue and local taste guide"
 authors = ["Watchmaker"]
 edition = "2021"

@@ -7,6 +7,7 @@ const ALLOWED_EXTERNAL_HOSTS = new Set([
   "www.disneyplus.com",
   "play.max.com",
   "www.dropout.tv",
+  "watch.dropout.tv",
   "www.google.com",
   "www.themoviedb.org",
 ]);
@@ -55,11 +56,13 @@ export function providerSearchUrl(providerName: string, title: string): string {
   if (name.includes("amazon") || name.includes("prime video")) {
     return `https://www.primevideo.com/search/ref=atv_nb_sr?phrase=${query}`;
   }
-  if (name.includes("disney")) return `https://www.disneyplus.com/search?q=${query}`;
+  // Disney+ no longer exposes a stable external search route. Open its valid
+  // signed-in browse screen instead of sending the browser to a known 404.
+  if (name.includes("disney")) return "https://www.disneyplus.com/browse/home";
   if (name === "max" || name.includes("hbo max")) {
     return `https://play.max.com/search?q=${query}`;
   }
-  if (name.includes("dropout")) return `https://www.dropout.tv/search?q=${query}`;
+  if (name.includes("dropout")) return `https://watch.dropout.tv/search?q=${query}`;
 
   return `https://www.google.com/search?q=${encodeURIComponent(
     `${title} watch on ${providerName}`,

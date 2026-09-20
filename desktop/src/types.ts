@@ -43,6 +43,7 @@ export interface CatalogItem {
   voteAverage: number;
   voteCount: number;
   popularity: number;
+  semanticVector?: string;
   providerLinks: ProviderLink[];
   syncedAt: number;
 }

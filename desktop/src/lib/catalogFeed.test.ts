@@ -104,6 +104,25 @@ describe("publisher-managed catalogue feed", () => {
     )).rejects.toThrow("unsafe poster path");
   });
 
+  it("rejects a malformed semantic fingerprint", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      generatedAt: 1,
+      region: "TR",
+      language: "en-US",
+      provider,
+      mediaType: "tv",
+      items: [{ ...item, semanticVector: "not-a-vector" }],
+    }), { status: 200, headers: { "Content-Type": "application/json" } })));
+
+    await expect(fetchProviderCatalog(
+      { region: "TR", language: "en-US" },
+      provider,
+      "tv",
+      undefined,
+      "https://catalog.example/v1",
+    )).rejects.toThrow("invalid semantic fingerprint");
+  });
+
   it("rejects service metadata for the wrong region", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
       generatedAt: 1,

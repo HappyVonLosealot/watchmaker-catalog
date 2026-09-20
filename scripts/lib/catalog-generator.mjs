@@ -1,5 +1,11 @@
 import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+import {
+  createSemanticEncoder,
+  SEMANTIC_MODEL,
+  SEMANTIC_VECTOR_DIMENSIONS,
+  SEMANTIC_VECTOR_FORMAT,
+} from "./semantic-vectors.mjs";
 
 export const API_ROOT = "https://api.themoviedb.org/3";
 export const FEED_SCHEMA_VERSION = 2;
@@ -100,6 +106,10 @@ export function configurationFromEnvironment(environment = process.env) {
     retries: integer(environment.WATCHMAKER_REQUEST_RETRIES, DEFAULT_RETRIES, {
       min: 1,
       max: 8,
+    }),
+    semanticBatchSize: integer(environment.WATCHMAKER_SEMANTIC_BATCH_SIZE, 96, {
+      min: 8,
+      max: 256,
     }),
   };
 }
@@ -532,9 +542,19 @@ export async function generateCatalogFeed(configuration, dependencies = {}) {
   const tmdbGet = dependencies.tmdbGet || createTmdbClient(configuration);
   const logger = dependencies.logger || console;
   const generatedAt = dependencies.generatedAt || Date.now();
+  const semanticEncoder =
+    dependencies.semanticEncoder ||
+    (await createSemanticEncoder({ batchSize: configuration.semanticBatchSize }));
   const buildingRoot = configuration.outputRoot + `.building-${process.pid}`;
   const warnings = [];
-  const statistics = { regions: 0, locales: 0, slices: 0, titles: 0, withPosters: 0 };
+  const statistics = {
+    regions: 0,
+    locales: 0,
+    slices: 0,
+    titles: 0,
+    withPosters: 0,
+    withSemanticVectors: 0,
+  };
 
   await rm(buildingRoot, { recursive: true, force: true });
   await mkdir(buildingRoot, { recursive: true });
@@ -588,9 +608,11 @@ export async function generateCatalogFeed(configuration, dependencies = {}) {
             } else if (fallbackLanguage) {
               items = mergeLocalizedItems(items, fallbackSlices.get(sliceKey) ?? []);
             }
+            items = await semanticEncoder.attach(items);
             statistics.slices += 1;
             statistics.titles += items.length;
             statistics.withPosters += items.filter((item) => item.posterPath).length;
+            statistics.withSemanticVectors += items.filter((item) => item.semanticVector).length;
             await writeJson(
               buildingRoot,
               `${region}/${language}/${providerGroup.provider.id}/${mediaType}.json`,
@@ -618,6 +640,12 @@ export async function generateCatalogFeed(configuration, dependencies = {}) {
       monetizationTypes: ["flatrate"],
       statistics,
       warnings,
+      semanticMatching: {
+        model: SEMANTIC_MODEL,
+        dimensions: SEMANTIC_VECTOR_DIMENSIONS,
+        format: SEMANTIC_VECTOR_FORMAT,
+        generatedAheadOfTime: true,
+      },
       attribution: [TMDB_ATTRIBUTION, AVAILABILITY_ATTRIBUTION],
     });
 

@@ -32,11 +32,16 @@ describe("external provider handoff", () => {
   it.each([
     ["Netflix", "https://www.netflix.com/search?q=A%20Film%20%26%20Friends"],
     ["Amazon Prime Video", "https://www.primevideo.com/search/ref=atv_nb_sr?phrase=A%20Film%20%26%20Friends"],
-    ["Disney Plus", "https://www.disneyplus.com/search?q=A%20Film%20%26%20Friends"],
     ["Max", "https://play.max.com/search?q=A%20Film%20%26%20Friends"],
-    ["Dropout", "https://www.dropout.tv/search?q=A%20Film%20%26%20Friends"],
+    ["Dropout", "https://watch.dropout.tv/search?q=A%20Film%20%26%20Friends"],
   ])("builds an encoded HTTPS search for %s", (provider, expected) => {
     expect(providerSearchUrl(provider, item.title)).toBe(expected);
+  });
+
+  it("opens Disney+'s valid signed-in browse screen instead of its dead query route", () => {
+    expect(providerSearchUrl("Disney Plus", item.title)).toBe(
+      "https://www.disneyplus.com/browse/home",
+    );
   });
 
   it("rejects unsafe supplied links and uses the provider search instead", () => {
@@ -51,6 +56,7 @@ describe("external provider handoff", () => {
 
   it("allows only the explicit HTTPS host list", () => {
     expect(isAllowedExternalUrl("https://www.dropout.tv/search?q=test")).toBe(true);
+    expect(isAllowedExternalUrl("https://watch.dropout.tv/search?q=test")).toBe(true);
     expect(isAllowedExternalUrl("javascript:alert(1)")).toBe(false);
     expect(isAllowedExternalUrl("https://www.netflix.com.attacker.invalid/title/1")).toBe(false);
   });

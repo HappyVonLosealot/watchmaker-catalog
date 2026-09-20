@@ -5,6 +5,7 @@ export const POSTER_ROOT = "https://image.tmdb.org/t/p/w500";
 export const BACKDROP_ROOT = "https://image.tmdb.org/t/p/w1280";
 export const PROVIDER_LOGO_ROOT = "https://image.tmdb.org/t/p/w92";
 const IMAGE_PATH = /^\/[A-Za-z0-9._/-]+$/;
+const SEMANTIC_VECTOR = /^[A-Za-z0-9+/]{512}$/;
 const MAX_SLICE_ITEMS = 100_000;
 
 const BUNDLED_FEED_ROOT = "/catalog/v1";
@@ -134,6 +135,9 @@ function assertItem(item: CatalogItem, provider: Provider, mediaType: MediaType)
   }
   if (item.backdropPath !== null && !IMAGE_PATH.test(item.backdropPath)) {
     throw new Error("The catalogue feed returned an unsafe backdrop path.");
+  }
+  if (item.semanticVector !== undefined && !SEMANTIC_VECTOR.test(item.semanticVector)) {
+    throw new Error("The catalogue feed returned an invalid semantic fingerprint.");
   }
   if (
     item.providerLinks.length !== 1 ||
