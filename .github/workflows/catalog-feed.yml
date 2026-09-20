@@ -1,0 +1,54 @@
+name: Refresh Watchmaker catalogue feed
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 2 * * *"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: watchmaker-catalogue
+  cancel-in-progress: false
+
+jobs:
+  build-feed:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Generate subscription-only catalogue
+        run: node scripts/generate-catalog-feed.mjs
+        env:
+          TMDB_READ_TOKEN: ${{ secrets.TMDB_READ_TOKEN }}
+          WATCHMAKER_REGIONS: ${{ vars.WATCHMAKER_REGIONS || 'TR' }}
+          WATCHMAKER_LANGUAGES: ${{ vars.WATCHMAKER_LANGUAGES || 'tr-TR,en-US' }}
+          WATCHMAKER_PAGE_LIMIT: ${{ vars.WATCHMAKER_PAGE_LIMIT || '0' }}
+          WATCHMAKER_REQUEST_CONCURRENCY: ${{ vars.WATCHMAKER_REQUEST_CONCURRENCY || '4' }}
+
+      - name: Validate catalogue integrity and artwork metadata
+        run: node scripts/validate-catalog-feed.mjs catalog-dist/v1
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload catalogue artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: catalog-dist
+
+      - name: Publish catalogue
+        id: deployment
+        uses: actions/deploy-pages@v4
