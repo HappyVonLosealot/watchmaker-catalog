@@ -1,0 +1,10 @@
+{
+  "name": "watchmaker-catalog-feed",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "node scripts/generate-catalog-feed.mjs",
+    "validate": "node scripts/validate-catalog-feed.mjs catalog-dist/v1"
+  }
+}
