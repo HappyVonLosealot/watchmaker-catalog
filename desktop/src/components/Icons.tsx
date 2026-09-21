@@ -30,6 +30,12 @@ export const SparklesIcon = (props: IconProps) => (
 export const FlameIcon = (props: IconProps) => (
   <IconBase {...props}><path d="M13.5 2.5c.7 3.8-2.4 5-2.4 7.8 0 1.2.8 2.1 1.9 2.1 1.8 0 2.8-1.8 2.5-3.6 2.5 1.8 4 4.1 4 6.6A7.5 7.5 0 0 1 4.5 15c0-3 1.7-5.8 4.7-8.2-.2 2.4.8 3.4 1.7 3.5-.3-3.2.5-5.7 2.6-7.8Z" /><path d="M9.2 20.8c-1.1-2.4-.2-4.5 2.2-6.3-.1 1.8.7 2.6 1.6 2.6 1.1 0 1.8-1.1 1.6-2.3 1.4 1.3 1.8 3.8.2 6" /></IconBase>
 );
+export const SlidersIcon = (props: IconProps) => (
+  <IconBase {...props}><path d="M4 6h7M15 6h5M4 12h3M11 12h9M4 18h9M17 18h3" /><circle cx="13" cy="6" r="2" /><circle cx="9" cy="12" r="2" /><circle cx="15" cy="18" r="2" /></IconBase>
+);
+export const MessageIcon = (props: IconProps) => (
+  <IconBase {...props}><path d="M5 5.5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-5 3v-13a2 2 0 0 1 2-2Z" /><path d="M8 10h8M8 13.5h5" /></IconBase>
+);
 export const BookmarkIcon = (props: IconProps) => (
   <IconBase {...props}><path d="M6.5 4.5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v17l-5.5-3.7-5.5 3.7v-17Z" /></IconBase>
 );

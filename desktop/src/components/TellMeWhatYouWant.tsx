@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
 import type { CatalogItem, TasteSignal } from "../types";
 import { recommendFromPrompt } from "../lib/promptRecommendations";
-import { SearchIcon, SparklesIcon } from "./Icons";
+import { SearchIcon } from "./Icons";
 import { MediaGrid } from "./MediaGrid";
 
 interface TellMeWhatYouWantProps {
@@ -71,13 +71,9 @@ export function TellMeWhatYouWant({
       <div className="prompt-recommender-heading">
         <div className="prompt-recommender-icon"><SearchIcon /></div>
         <div>
-          <span className="eyebrow">DESCRIBE THE NIGHT</span>
-          <h2 id="prompt-recommender-heading">Tell Me Whatcu&apos; Want</h2>
+          <span className="eyebrow">LOCAL PROMPT MATCHING</span>
+          <h2 id="prompt-recommender-heading">Describe tonight&apos;s watch</h2>
           <p>Write naturally. Watchmaker pulls out the useful ideas, checks full descriptions first, and keeps genres as supporting evidence.</p>
-        </div>
-        <div className="local-prompt-badge">
-          <SparklesIcon />
-          <span><strong>Free & local</strong><small>No prompt is sent anywhere</small></span>
         </div>
       </div>
 

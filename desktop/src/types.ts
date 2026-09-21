@@ -1,6 +1,6 @@
 export type MediaType = "movie" | "tv";
 export type ContentFormat = "series" | "miniseries" | "movie";
-export type AppView = "discover" | "hotline" | "tastemaker" | "watchlist" | "additions" | "settings";
+export type AppView = "discover" | "hotline" | "vibe" | "prompt" | "tastemaker" | "watchlist" | "additions" | "settings";
 export type SearchMode = "name" | "tags" | "concept";
 export type CatalogSort = "popularity" | "rating" | "release-newest" | "release-oldest";
 

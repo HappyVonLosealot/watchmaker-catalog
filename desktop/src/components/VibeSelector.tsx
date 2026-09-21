@@ -132,7 +132,7 @@ export function VibeSelector({
         <div className="vibe-heading-icon"><SparklesIcon /></div>
         <div>
           <span className="eyebrow">MOOD-FIRST DISCOVERY</span>
-          <h2 id="vibe-heading">What&apos;s The Vibe?</h2>
+          <h2 id="vibe-heading">Dial in tonight</h2>
           <p>Move only the dials you care about. Story-vibe fingerprints are precomputed—no live AI or extra cost.</p>
         </div>
         {active && (

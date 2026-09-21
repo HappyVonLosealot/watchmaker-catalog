@@ -9,8 +9,8 @@ This repository builds the public, read-only catalogue used by the **Watchmaker*
 - Subscription (`flatrate`) availability only—rentals and purchases are excluded
 - Titles, descriptions, genres, ratings, release dates, provider links, and TMDb thumbnail paths
 - Precomputed multilingual synopsis fingerprints for meaning-based TasteMaker matches
-- A six-dial **What's The Vibe?** picker that ranks mood, tone, pace, format, emotional weight, and production polish entirely on-device
-- **Tell Me Whatcu' Want**, a private free-writing recommender that extracts useful concepts, understands exclusions, and compares them against full descriptions locally
+- A dedicated **What's The Vibe?** page with six dials that rank mood, tone, pace, format, emotional weight, and production polish entirely on-device
+- A dedicated **Tell Me Whatcu' Want** page: a private free-writing recommender that extracts useful concepts, understands exclusions, and compares them against full descriptions locally
 - Self-building Smart Collections for comfort watches, beautifully bleak stories, full-throttle picks, hidden gems, and prestige productions
 - A Hotline page ranking subscription titles by TMDb's weekly trends, with popularity fallback
 - Latest aired episodes from Dimension 20, Game Changer, Make Some Noise, and Smartypants

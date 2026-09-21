@@ -5,9 +5,11 @@ import {
   CompassIcon,
   FlameIcon,
   GlobeIcon,
+  MessageIcon,
   RefreshIcon,
   SettingsIcon,
   ShieldIcon,
+  SlidersIcon,
   SparklesIcon,
 } from "./Icons";
 
@@ -23,6 +25,8 @@ interface SidebarProps {
 const navigation = [
   { id: "discover" as const, label: "Discover", icon: CompassIcon },
   { id: "hotline" as const, label: "Hotline", icon: FlameIcon },
+  { id: "vibe" as const, label: "What's The Vibe?", icon: SlidersIcon },
+  { id: "prompt" as const, label: "Tell Me Whatcu' Want", icon: MessageIcon },
   { id: "tastemaker" as const, label: "Tastemaker", icon: SparklesIcon },
   { id: "watchlist" as const, label: "Watchlist", icon: BookmarkIcon },
   { id: "additions" as const, label: "Addition", icon: GlobeIcon },

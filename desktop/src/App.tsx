@@ -27,6 +27,8 @@ import { WatchlistView } from "./views/WatchlistView";
 import { SettingsView } from "./views/SettingsView";
 import { AdditionsView } from "./views/AdditionsView";
 import { HotlineView } from "./views/HotlineView";
+import { VibeView } from "./views/VibeView";
+import { TellMeView } from "./views/TellMeView";
 
 const INITIAL_SYNC: SyncProgress = {
   state: "idle",
@@ -193,6 +195,12 @@ export default function App() {
             hotline={hotline}
             onOpen={setSelectedItem}
           />
+        )}
+        {currentView === "vibe" && (
+          <VibeView {...sharedViewProps} onSettings={() => setCurrentView("settings")} />
+        )}
+        {currentView === "prompt" && (
+          <TellMeView {...sharedViewProps} onSettings={() => setCurrentView("settings")} />
         )}
         {currentView === "tastemaker" && (
           <TastemakerView {...sharedViewProps} onSettings={() => setCurrentView("settings")} />
