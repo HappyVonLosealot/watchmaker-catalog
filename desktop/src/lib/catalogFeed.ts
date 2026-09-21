@@ -204,6 +204,30 @@ function assertItem(
     throw new Error("The catalogue feed returned an invalid semantic fingerprint.");
   }
   if (
+    item.contentFormat !== undefined &&
+    (item.mediaType === "movie"
+      ? item.contentFormat !== "movie"
+      : !["series", "miniseries"].includes(item.contentFormat))
+  ) {
+    throw new Error("The catalogue feed returned an invalid content format.");
+  }
+  if (item.vibeScores !== undefined) {
+    const signedScores = [
+      item.vibeScores.cozyStressful,
+      item.vibeScores.funnyGrim,
+      item.vibeScores.slowFast,
+      item.vibeScores.lightDevastating,
+    ];
+    if (
+      !signedScores.every((score) => Number.isFinite(score) && score >= -1 && score <= 1) ||
+      !Number.isFinite(item.vibeScores.productionPolish) ||
+      item.vibeScores.productionPolish < 0 ||
+      item.vibeScores.productionPolish > 1
+    ) {
+      throw new Error("The catalogue feed returned invalid vibe scores.");
+    }
+  }
+  if (
     item.providerLinks.length !== 1 ||
     item.providerLinks[0].providerId !== provider.id ||
     item.providerLinks[0].providerName !== provider.name

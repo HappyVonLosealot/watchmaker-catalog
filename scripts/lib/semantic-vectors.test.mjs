@@ -56,3 +56,31 @@ test("the encoder batches uncached descriptions and reuses their fingerprints", 
   assert.equal(first[0].semanticVector, first[1].semanticVector);
   assert.equal(second[0].semanticVector, first[0].semanticVector);
 });
+
+test("precomputes local vibe axes from story meaning without a runtime AI call", async () => {
+  const extractor = async (documents) => ({
+    tolist: () => documents.map((document) => {
+      if (/warm, gentle/i.test(document)) return vector(-1);
+      if (/tense, anxious/i.test(document) || /danger closes in/i.test(document)) return vector(1);
+      const values = vector(0);
+      values[1] = 1;
+      return values;
+    }),
+  });
+  const encoder = await createSemanticEncoder({ extractor, batchSize: 8 });
+  const items = await encoder.attach([{
+    title: "Pressure",
+    overview: "Danger closes in while the trapped crew races to escape.",
+    genreNames: ["Thriller"],
+    voteAverage: 8,
+    voteCount: 1200,
+    popularity: 80,
+    posterPath: "/poster.jpg",
+    backdropPath: "/backdrop.jpg",
+  }]);
+  const [scored] = await encoder.attachVibes(items);
+
+  assert.ok(scored.vibeScores.cozyStressful > 0.9);
+  assert.ok(scored.vibeScores.productionPolish > 0.5);
+  assert.equal(scored.semanticVector, items[0].semanticVector);
+});

@@ -17,6 +17,8 @@ let sliceCount = 0;
 let titleCount = 0;
 let posterCount = 0;
 let semanticVectorCount = 0;
+let vibeScoreCount = 0;
+let contentFormatCount = 0;
 let directDisneyLinkCount = 0;
 let disneyHandoffCount = 0;
 let trendingRankCount = 0;
@@ -55,6 +57,12 @@ function validateItem(item, mediaType, provider, region, language, location, see
   titleCount += 1;
   if (!Number.isSafeInteger(item?.tmdbId)) fail(location, "tmdbId must be a safe integer");
   if (item?.mediaType !== mediaType) fail(location, `expected mediaType ${mediaType}`);
+  const expectedFormats = mediaType === "movie" ? ["movie"] : ["series", "miniseries"];
+  if (!expectedFormats.includes(item?.contentFormat)) {
+    fail(location, `contentFormat must match ${mediaType}`);
+  } else {
+    contentFormatCount += 1;
+  }
   if (item?.key !== `${mediaType}:${item?.tmdbId}`) fail(location, "key does not match media type and id");
   if (seen.has(item?.key)) fail(location, "duplicate title key in provider slice");
   seen.add(item?.key);
@@ -114,6 +122,21 @@ function validateItem(item, mediaType, provider, region, language, location, see
     fail(location, "semanticVector must be a 384-byte int8 base64 fingerprint");
   } else {
     semanticVectorCount += 1;
+  }
+  const vibeScores = item?.vibeScores;
+  const signedVibeAxes = ["cozyStressful", "funnyGrim", "slowFast", "lightDevastating"];
+  const signedScoresAreValid = signedVibeAxes.every(
+    (axis) => Number.isFinite(vibeScores?.[axis]) && vibeScores[axis] >= -1 && vibeScores[axis] <= 1,
+  );
+  if (
+    !signedScoresAreValid ||
+    !Number.isFinite(vibeScores?.productionPolish) ||
+    vibeScores.productionPolish < 0 ||
+    vibeScores.productionPolish > 1
+  ) {
+    fail(location, "vibeScores must contain finite precomputed scores in range");
+  } else {
+    vibeScoreCount += 1;
   }
 }
 
@@ -324,6 +347,20 @@ if (manifest.statistics) {
       "manifest.json",
       `statistics.withSemanticVectors says ${manifest.statistics.withSemanticVectors}, ` +
         `validated ${semanticVectorCount}`,
+    );
+  }
+  if (manifest.statistics.withVibeScores !== vibeScoreCount) {
+    fail(
+      "manifest.json",
+      `statistics.withVibeScores says ${manifest.statistics.withVibeScores}, ` +
+        `validated ${vibeScoreCount}`,
+    );
+  }
+  if (manifest.statistics.withContentFormats !== contentFormatCount) {
+    fail(
+      "manifest.json",
+      `statistics.withContentFormats says ${manifest.statistics.withContentFormats}, ` +
+        `validated ${contentFormatCount}`,
     );
   }
   if (manifest.statistics.withDirectDisneyLinks !== directDisneyLinkCount) {

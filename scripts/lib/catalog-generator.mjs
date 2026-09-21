@@ -435,7 +435,7 @@ function safeImagePath(value) {
   return typeof value === "string" && /^\/[A-Za-z0-9._/-]+$/.test(value) ? value : null;
 }
 
-export function mapResult(result, mediaType, provider, genres, generatedAt) {
+export function mapResult(result, mediaType, provider, genres, generatedAt, contentFormat) {
   const title = result.title || result.name || result.original_title || result.original_name || "Untitled";
   const genreIds = Array.isArray(result.genre_ids)
     ? result.genre_ids.filter(Number.isSafeInteger)
@@ -444,6 +444,7 @@ export function mapResult(result, mediaType, provider, genres, generatedAt) {
     key: mediaType + ":" + result.id,
     tmdbId: result.id,
     mediaType,
+    contentFormat: contentFormat ?? (mediaType === "movie" ? "movie" : "series"),
     title,
     originalTitle: result.original_title || result.original_name || title,
     overview: typeof result.overview === "string" ? result.overview : "",
@@ -535,9 +536,28 @@ export async function fetchCatalogSlice({
     concurrency,
     warnings,
   });
+  const miniseriesIds = new Set();
+  if (mediaType === "tv") {
+    const miniseries = await fetchCompleteDiscover({
+      tmdbGet,
+      mediaType,
+      params: { ...params, with_type: 2 },
+      pageLimit,
+      exhaustive,
+      concurrency,
+      warnings,
+    });
+    for (const result of miniseries) miniseriesIds.add(result.id);
+  }
   const unique = new Map();
   for (const result of results) {
-    unique.set(result.id, mapResult(result, mediaType, provider, genres, generatedAt));
+    const contentFormat = mediaType === "movie"
+      ? "movie"
+      : miniseriesIds.has(result.id) ? "miniseries" : "series";
+    unique.set(
+      result.id,
+      mapResult(result, mediaType, provider, genres, generatedAt, contentFormat),
+    );
   }
   return [...unique.values()].sort(
     (left, right) => right.popularity - left.popularity || left.title.localeCompare(right.title),
@@ -583,6 +603,8 @@ export async function generateCatalogFeed(configuration, dependencies = {}) {
     titles: 0,
     withPosters: 0,
     withSemanticVectors: 0,
+    withVibeScores: 0,
+    withContentFormats: 0,
     withDirectDisneyLinks: 0,
     withDisneyHandoffs: 0,
     withTrendingRanks: 0,
@@ -656,6 +678,9 @@ export async function generateCatalogFeed(configuration, dependencies = {}) {
               warnings.push(...linked.warnings);
             }
             items = await semanticEncoder.attach(items);
+            if (typeof semanticEncoder.attachVibes === "function") {
+              items = await semanticEncoder.attachVibes(items);
+            }
             if (providerGroup.provider.id === DROPOUT_PROVIDER.id && mediaType === "tv") {
               dropoutCatalogItems = items;
             }
@@ -663,6 +688,8 @@ export async function generateCatalogFeed(configuration, dependencies = {}) {
             statistics.titles += items.length;
             statistics.withPosters += items.filter((item) => item.posterPath).length;
             statistics.withSemanticVectors += items.filter((item) => item.semanticVector).length;
+            statistics.withVibeScores += items.filter((item) => item.vibeScores).length;
+            statistics.withContentFormats += items.filter((item) => item.contentFormat).length;
             statistics.withTrendingRanks += items.filter((item) => item.trendingRank).length;
             await writeJson(
               buildingRoot,
@@ -733,6 +760,17 @@ export async function generateCatalogFeed(configuration, dependencies = {}) {
         dimensions: SEMANTIC_VECTOR_DIMENSIONS,
         format: SEMANTIC_VECTOR_FORMAT,
         generatedAheadOfTime: true,
+      },
+      vibeMatching: {
+        axes: [
+          "cozyStressful",
+          "funnyGrim",
+          "slowFast",
+          "lightDevastating",
+          "productionPolish",
+        ],
+        generatedAheadOfTime: true,
+        liveAiRequired: false,
       },
       attribution: [TMDB_ATTRIBUTION, AVAILABILITY_ATTRIBUTION],
     });

@@ -1,4 +1,5 @@
 export type MediaType = "movie" | "tv";
+export type ContentFormat = "series" | "miniseries" | "movie";
 export type AppView = "discover" | "hotline" | "tastemaker" | "watchlist" | "additions" | "settings";
 export type SearchMode = "name" | "tags" | "concept";
 export type CatalogSort = "popularity" | "rating" | "release-newest" | "release-oldest";
@@ -28,10 +29,19 @@ export interface GenreOption {
   name: string;
 }
 
+export interface VibeScores {
+  cozyStressful: number;
+  funnyGrim: number;
+  slowFast: number;
+  lightDevastating: number;
+  productionPolish: number;
+}
+
 export interface CatalogItem {
   key: string;
   tmdbId: number;
   mediaType: MediaType;
+  contentFormat?: ContentFormat;
   title: string;
   originalTitle: string;
   overview: string;
@@ -45,6 +55,7 @@ export interface CatalogItem {
   popularity: number;
   trendingRank?: number;
   semanticVector?: string;
+  vibeScores?: VibeScores;
   providerLinks: ProviderLink[];
   syncedAt: number;
 }

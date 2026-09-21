@@ -7,6 +7,8 @@ import { SearchToolbar } from "../components/SearchToolbar";
 import { MediaGrid } from "../components/MediaGrid";
 import { EmptyState } from "../components/EmptyState";
 import { Artwork } from "../components/Artwork";
+import { VibeSelector } from "../components/VibeSelector";
+import { SmartCollections } from "../components/SmartCollections";
 
 interface DiscoverViewProps {
   catalog: CatalogItem[];
@@ -168,6 +170,24 @@ export function DiscoverView({
               </div>
             </section>
           )}
+
+          <VibeSelector
+            catalog={catalog}
+            watchlist={watchlist}
+            tasteSignals={tasteSignals}
+            onOpen={onOpen}
+            onToggleWatchlist={onToggleWatchlist}
+            onTasteSignal={onTasteSignal}
+          />
+
+          <SmartCollections
+            catalog={catalog}
+            watchlist={watchlist}
+            tasteSignals={tasteSignals}
+            onOpen={onOpen}
+            onToggleWatchlist={onToggleWatchlist}
+            onTasteSignal={onTasteSignal}
+          />
 
           {sections.map((section) => (
             <section className="shelf-section" key={section.title}>
