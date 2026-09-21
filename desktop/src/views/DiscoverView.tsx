@@ -9,6 +9,7 @@ import { EmptyState } from "../components/EmptyState";
 import { Artwork } from "../components/Artwork";
 import { VibeSelector } from "../components/VibeSelector";
 import { SmartCollections } from "../components/SmartCollections";
+import { TellMeWhatYouWant } from "../components/TellMeWhatYouWant";
 
 interface DiscoverViewProps {
   catalog: CatalogItem[];
@@ -170,6 +171,15 @@ export function DiscoverView({
               </div>
             </section>
           )}
+
+          <TellMeWhatYouWant
+            catalog={catalog}
+            watchlist={watchlist}
+            tasteSignals={tasteSignals}
+            onOpen={onOpen}
+            onToggleWatchlist={onToggleWatchlist}
+            onTasteSignal={onTasteSignal}
+          />
 
           <VibeSelector
             catalog={catalog}

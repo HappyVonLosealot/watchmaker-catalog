@@ -10,6 +10,7 @@ This repository builds the public, read-only catalogue used by the **Watchmaker*
 - Titles, descriptions, genres, ratings, release dates, provider links, and TMDb thumbnail paths
 - Precomputed multilingual synopsis fingerprints for meaning-based TasteMaker matches
 - A six-dial **What's The Vibe?** picker that ranks mood, tone, pace, format, emotional weight, and production polish entirely on-device
+- **Tell Me Whatcu' Want**, a private free-writing recommender that extracts useful concepts, understands exclusions, and compares them against full descriptions locally
 - Self-building Smart Collections for comfort watches, beautifully bleak stories, full-throttle picks, hidden gems, and prestige productions
 - A Hotline page ranking subscription titles by TMDb's weekly trends, with popularity fallback
 - Latest aired episodes from Dimension 20, Game Changer, Make Some Noise, and Smartypants
@@ -23,6 +24,8 @@ Hotline trend ranks and Dropout episode metadata are refreshed by the same free 
 TasteMaker's meaning fingerprints are generated during this free scheduled build with the Apache-2.0-licensed `paraphrase-multilingual-MiniLM-L12-v2` model. The desktop app downloads only compact int8 fingerprints and compares them locally. It runs no live AI model, calls no AI API, sends no viewing preference anywhere, and creates no cost for the user.
 
 The same scheduled build turns those fingerprints into compact story-vibe scores. Watchmaker's six vibe dials and Smart Collections use only those downloaded numbers plus local catalogue metadata. The “High Quality / Budget” dial is an honest estimate from audience confidence, popularity, ratings, and artwork coverage because studio budget data is not consistently available; choosing “Anything Goes” simply removes that constraint.
+
+Tell Me Whatcu' Want accepts an ordinary sentence such as “a funny zombie movie with friends, but no romance.” Watchmaker removes filler words, expands a transparent local synonym list, applies explicit exclusions, and weights matches found in full descriptions above title and genre matches. If the prompt says “like” a known title, the already-downloaded synopsis fingerprints provide the story reference. The prompt never leaves the desktop app.
 
 Disney+ does not publish a stable externally prefilled search page. The catalogue therefore matches TMDb title IDs to public Wikidata Disney+ IDs during its free scheduled build. A match opens the exact localized Disney+ title page. An unmatched title opens TMDb's title-specific provider handoff instead of the Disney+ home page, so no title needs to be typed manually.
 
