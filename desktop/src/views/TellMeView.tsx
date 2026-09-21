@@ -32,7 +32,7 @@ export function TellMeView({
         <div>
           <span className="eyebrow">SAY IT YOUR WAY</span>
           <h1>Tell Me Whatcu&apos; Want</h1>
-          <p className="header-copy">Describe whatever you feel like watching in plain language. Watchmaker compares your ideas with full title descriptions and recommends only included content.</p>
+          <p className="header-copy">Describe whatever you feel like watching in plain language. A bundled local language model understands the complete request, then compares it with full title descriptions and recommends only included content.</p>
         </div>
         <div className="zero-cost-badge"><MessageIcon /><span><strong>Free &amp; private</strong><small>No prompt is sent anywhere</small></span></div>
       </header>

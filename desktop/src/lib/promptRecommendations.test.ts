@@ -72,6 +72,40 @@ describe("Tell Me Whatcu' Want", () => {
     ]));
   });
 
+  it("keeps the subject above incidental words in the cat-life prompt", () => {
+    const cats = item(
+      1,
+      "Whisker Days",
+      "A playful comedy following house cats through their everyday adventures.",
+      ["Comedy"],
+      "movie",
+      { semanticVector: semanticVector(127) },
+    );
+    const standup = item(
+      2,
+      "The Daily Stand-Up",
+      "A funny comedian performs topical jokes for a live audience each day.",
+      ["Comedy"],
+      "movie",
+      { semanticVector: semanticVector(0, 127) },
+    );
+    const promptVector = new Float32Array(384);
+    promptVector[0] = 1;
+
+    const result = recommendFromPrompt(
+      [standup, cats],
+      "A funny movie about the daily life of cats",
+      new Map(),
+      Date.now(),
+      promptVector,
+    );
+
+    expect(result.semantic).toBe(true);
+    expect(result.coreIdeas).toEqual(["cats"]);
+    expect(result.moodIdeas).toEqual(["funny"]);
+    expect(result.matches.map((match) => match.item)).toEqual([cats]);
+  });
+
   it("understands a simple exclusion such as no romance", () => {
     const romantic = item(
       1,

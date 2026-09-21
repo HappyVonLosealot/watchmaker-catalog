@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import type { CatalogItem, TasteSignal } from "../types";
-import { recommendFromPrompt } from "../lib/promptRecommendations";
+import { recommendFromPrompt, type PromptRecommendationResult } from "../lib/promptRecommendations";
+import { encodePromptLocally } from "../lib/localPromptEncoder";
 import { SearchIcon } from "./Icons";
 import { MediaGrid } from "./MediaGrid";
 
@@ -35,19 +36,55 @@ export function TellMeWhatYouWant({
   const [draft, setDraft] = useState("");
   const [submittedPrompt, setSubmittedPrompt] = useState("");
   const [resultLimit, setResultLimit] = useState(6);
-  const result = useMemo(
-    () => submittedPrompt
-      ? recommendFromPrompt(catalog, submittedPrompt, tasteSignals)
-      : null,
-    [catalog, submittedPrompt, tasteSignals],
-  );
+  const [result, setResult] = useState<PromptRecommendationResult | null>(null);
+  const [matching, setMatching] = useState(false);
+  const [status, setStatus] = useState("");
+  const [error, setError] = useState("");
+  const requestRef = useRef(0);
 
   useEffect(() => setResultLimit(6), [submittedPrompt]);
+  useEffect(() => () => {
+    requestRef.current += 1;
+  }, []);
+
+  const runPrompt = async (prompt: string) => {
+    const request = requestRef.current + 1;
+    requestRef.current = request;
+    setSubmittedPrompt(prompt);
+    setResult(null);
+    setError("");
+    setMatching(true);
+    setStatus("Starting private whole-prompt matching…");
+    try {
+      const vector = await encodePromptLocally(prompt, (nextStatus) => {
+        if (requestRef.current === request) setStatus(nextStatus);
+      });
+      if (requestRef.current !== request) return;
+      setStatus("Comparing meaning with included title descriptions…");
+      const nextResult = recommendFromPrompt(
+        catalog,
+        prompt,
+        tasteSignals,
+        Date.now(),
+        vector,
+      );
+      if (requestRef.current === request) setResult(nextResult);
+    } catch (caught) {
+      if (requestRef.current === request) {
+        setError(caught instanceof Error ? caught.message : "The local understanding model could not start.");
+      }
+    } finally {
+      if (requestRef.current === request) {
+        setMatching(false);
+        setStatus("");
+      }
+    }
+  };
 
   const submit = (event?: FormEvent) => {
     event?.preventDefault();
     const prompt = draft.trim();
-    if (prompt.length >= 3) setSubmittedPrompt(prompt);
+    if (prompt.length >= 3 && !matching) void runPrompt(prompt);
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -59,7 +96,17 @@ export function TellMeWhatYouWant({
 
   const useExample = (example: string) => {
     setDraft(example);
-    setSubmittedPrompt(example);
+    void runPrompt(example);
+  };
+
+  const clearPrompt = () => {
+    requestRef.current += 1;
+    setDraft("");
+    setSubmittedPrompt("");
+    setResult(null);
+    setMatching(false);
+    setStatus("");
+    setError("");
   };
 
   const visibleMatches = result?.matches.slice(0, resultLimit) ?? [];
@@ -73,7 +120,7 @@ export function TellMeWhatYouWant({
         <div>
           <span className="eyebrow">LOCAL PROMPT MATCHING</span>
           <h2 id="prompt-recommender-heading">Describe tonight&apos;s watch</h2>
-          <p>Write naturally. Watchmaker pulls out the useful ideas, checks full descriptions first, and keeps genres as supporting evidence.</p>
+          <p>Write naturally. Watchmaker understands the complete sentence locally, makes the story subject most important, and treats tone and ratings as supporting signals.</p>
         </div>
       </div>
 
@@ -84,6 +131,7 @@ export function TellMeWhatYouWant({
           onKeyDown={handleKeyDown}
           maxLength={500}
           rows={3}
+          disabled={matching}
           placeholder="Try: A funny zombie movie with a group of friends, but no romance…"
           aria-label="Describe what you want to watch"
         />
@@ -94,16 +142,13 @@ export function TellMeWhatYouWant({
               <button
                 className="text-link"
                 type="button"
-                onClick={() => {
-                  setDraft("");
-                  setSubmittedPrompt("");
-                }}
+                onClick={clearPrompt}
               >
                 Clear
               </button>
             )}
-            <button className="primary-button" type="submit" disabled={draft.trim().length < 3}>
-              Find my watch <SearchIcon />
+            <button className="primary-button" type="submit" disabled={draft.trim().length < 3 || matching}>
+              {matching ? "Understanding…" : "Find my watch"} <SearchIcon />
             </button>
           </div>
         </div>
@@ -118,16 +163,33 @@ export function TellMeWhatYouWant({
         </div>
       )}
 
-      {result && (
+      {matching && (
+        <div className="prompt-inline-message prompt-loading" aria-live="polite">
+          <span className="status-dot syncing" />
+          {status || "Understanding the complete request on this PC…"}
+        </div>
+      )}
+
+      {error && !matching && (
+        <div className="prompt-inline-message prompt-error" role="alert">
+          The bundled local understanding model could not run. {error}
+        </div>
+      )}
+
+      {result && !matching && (
         <div className="prompt-results">
           <div className="prompt-reading">
-            <strong>Watchmaker read:</strong>
+            <strong>Watchmaker understood:</strong>
+            {result.semantic && <span className="prompt-chip semantic">Whole-prompt meaning</span>}
             {result.referencedTitles.map((title) => (
               <span className="prompt-chip reference" key={`title:${title}`}>Like {title}</span>
             ))}
-            {result.format && <span className="prompt-chip">{formatLabel(result.format)}</span>}
-            {result.wantedKeywords.map((keyword) => (
-              <span className="prompt-chip" key={`want:${keyword}`}>{keyword}</span>
+            {result.format && <span className="prompt-chip">Format: {formatLabel(result.format)}</span>}
+            {result.coreIdeas.map((idea) => (
+              <span className="prompt-chip primary" key={`core:${idea}`}>Story first: {idea}</span>
+            ))}
+            {result.moodIdeas.map((idea) => (
+              <span className="prompt-chip modifier" key={`mood:${idea}`}>Tone: {idea}</span>
             ))}
             {result.excludedKeywords.map((keyword) => (
               <span className="prompt-chip excluded" key={`avoid:${keyword}`}>No {keyword}</span>

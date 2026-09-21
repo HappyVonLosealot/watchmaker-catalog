@@ -10,7 +10,7 @@ This repository builds the public, read-only catalogue used by the **Watchmaker*
 - Titles, descriptions, genres, ratings, release dates, provider links, and TMDb thumbnail paths
 - Precomputed multilingual synopsis fingerprints for meaning-based TasteMaker matches
 - A dedicated **What's The Vibe?** page with six dials that rank mood, tone, pace, format, emotional weight, and production polish entirely on-device
-- A dedicated **Tell Me Whatcu' Want** page: a private free-writing recommender that extracts useful concepts, understands exclusions, and compares them against full descriptions locally
+- A dedicated **Tell Me Whatcu' Want** page: a private free-writing recommender whose bundled language model understands the complete request and compares it with full descriptions locally
 - Self-building Smart Collections for comfort watches, beautifully bleak stories, full-throttle picks, hidden gems, and prestige productions
 - A Hotline page ranking subscription titles by TMDb's weekly trends, with popularity fallback
 - Latest aired episodes from Dimension 20, Game Changer, Make Some Noise, and Smartypants
@@ -25,7 +25,9 @@ TasteMaker's meaning fingerprints are generated during this free scheduled build
 
 The same scheduled build turns those fingerprints into compact story-vibe scores. Watchmaker's six vibe dials and Smart Collections use only those downloaded numbers plus local catalogue metadata. The “High Quality / Budget” dial is an honest estimate from audience confidence, popularity, ratings, and artwork coverage because studio budget data is not consistently available; choosing “Anything Goes” simply removes that constraint.
 
-Tell Me Whatcu' Want accepts an ordinary sentence such as “a funny zombie movie with friends, but no romance.” Watchmaker removes filler words, expands a transparent local synonym list, applies explicit exclusions, and weights matches found in full descriptions above title and genre matches. If the prompt says “like” a known title, the already-downloaded synopsis fingerprints provide the story reference. The prompt never leaves the desktop app.
+Tell Me Whatcu' Want accepts an ordinary sentence such as “a funny movie about the daily life of cats.” The Windows installer includes the same Apache-2.0 multilingual MiniLM language model used to fingerprint the catalogue. On demand, Watchmaker turns the complete sentence into a meaning fingerprint and compares it with the included title descriptions. The story subject dominates, mood is supporting context, a requested format is enforced, and ratings are only a close-match tie-breaker. Explicit exclusions such as “no romance” are still applied deterministically. If the prompt says “like” a known title, the referenced title's story fingerprint remains the strongest signal.
+
+The local model loads only after **Find my watch** is selected, uses no paid service, and makes no network request. The prompt and its fingerprint remain on the user's PC. Bundling the model makes the installer larger, but keeps the feature private, predictable, and free to operate.
 
 Disney+ does not publish a stable externally prefilled search page. The catalogue therefore matches TMDb title IDs to public Wikidata Disney+ IDs during its free scheduled build. A match opens the exact localized Disney+ title page. An unmatched title opens TMDb's title-specific provider handoff instead of the Disney+ home page, so no title needs to be typed manually.
 

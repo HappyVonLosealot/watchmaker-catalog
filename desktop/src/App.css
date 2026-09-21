@@ -166,9 +166,14 @@ select { cursor: pointer; }
 .prompt-reading > strong { margin-right: 4px; color: var(--muted-strong); font-size: .65rem; }
 .prompt-chip { padding: 5px 8px; border: 1px solid rgba(216,173,87,.2); border-radius: 999px; color: var(--gold-bright); background: var(--gold-soft); font-size: .59rem; }
 .prompt-chip.reference { color: #a9dccc; border-color: rgba(115,197,168,.24); background: rgba(115,197,168,.065); }
+.prompt-chip.semantic { color: #bce6d8; border-color: rgba(115,197,168,.32); background: rgba(115,197,168,.09); }
+.prompt-chip.primary { color: #fff0c8; border-color: rgba(240,202,120,.38); background: rgba(216,173,87,.16); font-weight: 760; }
+.prompt-chip.modifier { color: #cbc5e8; border-color: rgba(166,151,216,.25); background: rgba(166,151,216,.07); }
 .prompt-chip.excluded { color: #d9a39e; border-color: rgba(231,130,120,.22); background: rgba(231,130,120,.06); text-decoration: line-through; text-decoration-thickness: 1px; }
 .prompt-result-heading { margin-bottom: 15px; }
 .prompt-inline-message { padding: 17px; border: 1px dashed var(--line-strong); border-radius: 10px; color: var(--muted); background: rgba(255,255,255,.012); text-align: center; font-size: .72rem; }
+.prompt-inline-message.prompt-loading { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 16px; color: #9bcfbd; border-color: rgba(115,197,168,.22); background: rgba(115,197,168,.035); }
+.prompt-inline-message.prompt-error { margin-top: 16px; color: #dba19b; border-color: rgba(231,130,120,.25); background: rgba(231,130,120,.035); }
 
 /* Vibe discovery */
 .vibe-view .vibe-section { margin-top: 0; }

@@ -1,4 +1,5 @@
 catalog-dist/
 .cache/
 desktop/dist/
+desktop/public/local-model/
 node_modules/

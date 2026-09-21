@@ -35,6 +35,8 @@ interface VibeTarget {
 interface PromptIntent {
   positive: PromptFeature[];
   negative: PromptFeature[];
+  primary: PromptFeature[];
+  modifiers: PromptFeature[];
   format: ContentFormat | null;
   seeds: CatalogItem[];
   vibeTargets: VibeTarget[];
@@ -45,23 +47,33 @@ export interface PromptMatch {
   score: number;
   reason: string;
   matchedKeywords: string[];
+  semanticSimilarity: number | null;
 }
 
 export interface PromptRecommendationResult {
   matches: PromptMatch[];
   wantedKeywords: string[];
+  coreIdeas: string[];
+  moodIdeas: string[];
   excludedKeywords: string[];
   referencedTitles: string[];
   format: ContentFormat | null;
   meaningful: boolean;
+  semantic: boolean;
 }
+
+const SEMANTIC_VECTOR_BYTES = 384;
+const SEMANTIC_VECTOR_PATTERN = /^[A-Za-z0-9+/]{512}$/;
+const MINIMUM_BEST_SEMANTIC_MATCH = 0.34;
+const MINIMUM_SEMANTIC_MATCH = 0.28;
+const SEMANTIC_RESULT_BAND = 0.22;
 
 const STOP_WORDS = new Set([
   "a", "about", "all", "also", "an", "and", "any", "anything", "are", "as", "at",
   "be", "but", "by", "can", "could", "do", "does", "for", "from", "give", "has", "have",
-  "good", "great", "i", "id", "if", "im", "in", "is", "it", "its", "just", "kind", "like",
+  "daily", "day", "everyday", "good", "great", "i", "id", "if", "im", "in", "is", "it", "its", "just", "kind", "life", "like",
   "me", "maybe", "more", "nice",
-  "movie", "of", "on", "or", "please", "really", "recommend", "show", "some", "something",
+  "movie", "of", "on", "or", "ordinary", "please", "really", "recommend", "show", "some", "something",
   "similar", "than", "that", "the", "then", "thing", "this", "to", "too", "very", "want", "watch",
   "where", "which", "who", "with", "would",
   // Turkish filler words for prompts and localized descriptions.
@@ -74,6 +86,7 @@ const NEGATION_FILLERS = new Set(["any", "anything", "much", "too", "very"]);
 const FORMAT_WORDS = new Set(["film", "films", "movie", "movies", "miniseries", "series"]);
 
 const CONCEPTS: ConceptDefinition[] = [
+  { key: "cats", label: "cats", terms: ["cat", "cats", "feline", "felines", "kitten", "kittens", "kitty", "kitties", "kedi", "kediler"] },
   { key: "zombies", label: "zombies / undead", terms: ["zombie", "zombies", "undead", "walker", "walkers", "zombi"] },
   { key: "comedy", label: "funny", terms: ["comedy", "comic", "comedic", "funny", "funnier", "hilarious", "joke", "jokes", "absurd", "komedi", "komik"] },
   { key: "horror", label: "horror", terms: ["horror", "scary", "scarier", "creepy", "terrifying", "frightening", "haunted", "korku", "korkunc"] },
@@ -287,8 +300,12 @@ function vibeTargets(features: PromptFeature[]): VibeTarget[] {
 function parsePrompt(catalog: CatalogItem[], prompt: string): PromptIntent {
   const seeds = detectReferencedTitles(catalog, prompt);
   const features = promptFeatures(prompt, seeds);
+  const primary = features.positive.filter((feature) => !VIBE_FEATURE_KEYS.has(feature.key));
+  const modifiers = features.positive.filter((feature) => VIBE_FEATURE_KEYS.has(feature.key));
   return {
     ...features,
+    primary,
+    modifiers,
     format: formatFromPrompt(prompt),
     seeds,
     vibeTargets: vibeTargets(features.positive),
@@ -329,6 +346,58 @@ function clamp(value: number, minimum = 0, maximum = 1): number {
   return Math.max(minimum, Math.min(maximum, value));
 }
 
+interface DecodedSemanticVector {
+  values: Int8Array;
+  length: number;
+}
+
+const semanticVectorCache = new Map<string, DecodedSemanticVector | null>();
+
+function decodeSemanticVector(encoded: string | undefined): DecodedSemanticVector | null {
+  if (!encoded || !SEMANTIC_VECTOR_PATTERN.test(encoded)) return null;
+  const cached = semanticVectorCache.get(encoded);
+  if (cached !== undefined) return cached;
+
+  try {
+    const binary = atob(encoded);
+    if (binary.length !== SEMANTIC_VECTOR_BYTES) return null;
+    const unsigned = new Uint8Array(SEMANTIC_VECTOR_BYTES);
+    for (let index = 0; index < binary.length; index += 1) {
+      unsigned[index] = binary.charCodeAt(index);
+    }
+    const values = new Int8Array(unsigned.buffer);
+    let squaredLength = 0;
+    for (const value of values) squaredLength += value * value;
+    const decoded = squaredLength > 0 ? { values, length: Math.sqrt(squaredLength) } : null;
+    semanticVectorCache.set(encoded, decoded);
+    return decoded;
+  } catch {
+    semanticVectorCache.set(encoded, null);
+    return null;
+  }
+}
+
+function promptSemanticSimilarity(
+  item: CatalogItem,
+  promptVector: ArrayLike<number> | undefined,
+): number | null {
+  const itemVector = decodeSemanticVector(item.semanticVector);
+  if (!itemVector || !promptVector || promptVector.length !== SEMANTIC_VECTOR_BYTES) return null;
+  let promptSquaredLength = 0;
+  let dotProduct = 0;
+  for (let index = 0; index < SEMANTIC_VECTOR_BYTES; index += 1) {
+    const promptValue = Number(promptVector[index]);
+    if (!Number.isFinite(promptValue)) return null;
+    promptSquaredLength += promptValue * promptValue;
+    dotProduct += promptValue * itemVector.values[index];
+  }
+  if (promptSquaredLength === 0) return null;
+  return Math.min(
+    Math.max(dotProduct / (Math.sqrt(promptSquaredLength) * itemVector.length), -1),
+    1,
+  );
+}
+
 function vibeMatch(item: CatalogItem, targets: VibeTarget[]): number {
   if (targets.length === 0) return 0;
   const scores = vibeScoresFor(item);
@@ -348,7 +417,12 @@ function matchReason(
   keywords: string[],
   seedTitles: string[],
   format: ContentFormat | null,
+  semantic: boolean,
 ): string {
+  if (semantic && seedTitles.length === 0) {
+    const detail = keywords.length > 0 ? ` Strongest cues: ${keywords.join(" · ")}.` : "";
+    return `Whole-prompt match: its synopsis is close to your requested story and mood.${detail}`;
+  }
   const parts: string[] = [];
   if (seedTitles.length > 0) parts.push(`story likeness to ${seedTitles.join(" + ")}`);
   if (keywords.length > 0) parts.push(keywords.join(" · "));
@@ -361,6 +435,7 @@ export function recommendFromPrompt(
   prompt: string,
   signals: Map<string, TasteSignal["value"]> = new Map(),
   now = Date.now(),
+  promptVector?: ArrayLike<number>,
 ): PromptRecommendationResult {
   const intent = parsePrompt(catalog, prompt);
   const meaningful =
@@ -372,10 +447,13 @@ export function recommendFromPrompt(
     return {
       matches: [],
       wantedKeywords: [],
+      coreIdeas: [],
+      moodIdeas: [],
       excludedKeywords: [],
       referencedTitles: [],
       format: null,
       meaningful: false,
+      semantic: Boolean(promptVector),
     };
   }
 
@@ -424,6 +502,9 @@ export function recommendFromPrompt(
           idf: idf.get(feature.key) ?? 1,
         }))
         .filter((entry) => entry.fieldWeight > 0);
+      const primaryKeywordMatches = keywordMatches.filter((entry) =>
+        intent.primary.some((feature) => feature.key === entry.feature.key),
+      );
       const matchedKeywordWeight = keywordMatches.reduce((total, entry) => total + entry.idf, 0);
       const lexicalStrength = keywordMatches.reduce(
         (total, entry) => total + entry.idf * entry.fieldWeight,
@@ -434,26 +515,47 @@ export function recommendFromPrompt(
       const rankedAt = seedRank.get(document.item.key);
       const seedScore = rankedAt === undefined ? 0 : 1 / (1 + rankedAt / 55);
       const localVibeScore = vibeMatch(document.item, intent.vibeTargets);
-      const hasRelevantMatch =
-        keywordMatches.some((entry) => !hasNonVibeKeywords || !VIBE_FEATURE_KEYS.has(entry.feature.key)) ||
-        rankedAt !== undefined ||
-        (!hasNonVibeKeywords && intent.vibeTargets.length > 0) ||
-        (intent.positive.length === 0 && intent.seeds.length === 0);
+      const semanticSimilarity = promptSemanticSimilarity(document.item, promptVector);
+      const hasSemanticMatch = semanticSimilarity !== null && semanticSimilarity > 0.05;
+      const hasRelevantMatch = promptVector
+        ? hasSemanticMatch || rankedAt !== undefined
+        : primaryKeywordMatches.length > 0 ||
+          rankedAt !== undefined ||
+          (!hasNonVibeKeywords && intent.vibeTargets.length > 0) ||
+          (intent.positive.length === 0 && intent.seeds.length === 0);
       if (!hasRelevantMatch) return null;
 
       let weightedScore = 0;
       let scoreWeight = 0;
-      if (intent.positive.length > 0) {
-        weightedScore += lexicalScore * 0.66;
-        scoreWeight += 0.66;
-      }
-      if (intent.vibeTargets.length > 0) {
-        weightedScore += localVibeScore * 0.22;
-        scoreWeight += 0.22;
-      }
-      if (intent.seeds.length > 0) {
-        weightedScore += seedScore * 0.68;
-        scoreWeight += 0.68;
+      if (promptVector && semanticSimilarity !== null) {
+        const semanticWeight = intent.seeds.length > 0 ? 0.22 : 0.78;
+        weightedScore += clamp((semanticSimilarity - 0.05) / 0.75) * semanticWeight;
+        scoreWeight += semanticWeight;
+        if (intent.positive.length > 0) {
+          weightedScore += lexicalScore * 0.08;
+          scoreWeight += 0.08;
+        }
+        if (intent.vibeTargets.length > 0) {
+          weightedScore += localVibeScore * 0.1;
+          scoreWeight += 0.1;
+        }
+        if (intent.seeds.length > 0) {
+          weightedScore += seedScore * 0.78;
+          scoreWeight += 0.78;
+        }
+      } else {
+        if (intent.positive.length > 0) {
+          weightedScore += lexicalScore * 0.66;
+          scoreWeight += 0.66;
+        }
+        if (intent.vibeTargets.length > 0) {
+          weightedScore += localVibeScore * 0.22;
+          scoreWeight += 0.22;
+        }
+        if (intent.seeds.length > 0) {
+          weightedScore += seedScore * 0.68;
+          scoreWeight += 0.68;
+        }
       }
       if (scoreWeight === 0) {
         weightedScore = 0.6;
@@ -462,7 +564,9 @@ export function recommendFromPrompt(
       const quality = generalRatingScore(document.item) / 10;
       const popularity = clamp(Math.log10(document.item.popularity + 1) / 3);
       const likedBoost = signals.get(document.item.key) === "liked" ? 0.025 : 0;
-      const score = weightedScore / scoreWeight + quality * 0.045 + popularity * 0.015 + likedBoost;
+      const tieBreakWeight = promptVector ? 0.012 : 0.06;
+      const score = weightedScore / scoreWeight +
+        quality * tieBreakWeight * 0.75 + popularity * tieBreakWeight * 0.25 + likedBoost;
       const matchedKeywords = keywordMatches
         .sort((left, right) => right.idf * right.fieldWeight - left.idf * left.fieldWeight)
         .slice(0, 3)
@@ -471,22 +575,46 @@ export function recommendFromPrompt(
         item: document.item,
         score,
         matchedKeywords,
-        reason: matchReason(matchedKeywords, seedTitles, intent.format),
+        reason: matchReason(matchedKeywords, seedTitles, intent.format, semanticSimilarity !== null),
+        semanticSimilarity,
       };
     })
     .filter((match): match is PromptMatch => match !== null)
     .sort((left, right) =>
       right.score - left.score ||
+      (right.semanticSimilarity ?? -1) - (left.semanticSimilarity ?? -1) ||
       right.item.voteCount - left.item.voteCount ||
       left.item.title.localeCompare(right.item.title),
     );
 
+  let relevantMatches = matches;
+  if (promptVector && intent.primary.length > 0 && intent.seeds.length === 0) {
+    const bestSemanticMatch = matches.reduce(
+      (best, match) => Math.max(best, match.semanticSimilarity ?? -1),
+      -1,
+    );
+    if (bestSemanticMatch < MINIMUM_BEST_SEMANTIC_MATCH) {
+      relevantMatches = [];
+    } else {
+      const cutoff = Math.max(
+        MINIMUM_SEMANTIC_MATCH,
+        bestSemanticMatch - SEMANTIC_RESULT_BAND,
+      );
+      relevantMatches = matches.filter((match) =>
+        (match.semanticSimilarity ?? -1) >= cutoff,
+      );
+    }
+  }
+
   return {
-    matches,
-    wantedKeywords: intent.positive.map((feature) => feature.label),
+    matches: relevantMatches.slice(0, 120),
+    wantedKeywords: [...intent.primary, ...intent.modifiers].map((feature) => feature.label),
+    coreIdeas: intent.primary.map((feature) => feature.label),
+    moodIdeas: intent.modifiers.map((feature) => feature.label),
     excludedKeywords: intent.negative.map((feature) => feature.label),
     referencedTitles: seedTitles,
     format: intent.format,
     meaningful: true,
+    semantic: Boolean(promptVector),
   };
 }

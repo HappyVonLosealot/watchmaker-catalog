@@ -39,8 +39,14 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
+      - name: Prepare bundled local language model
+        run: npm run model:prepare
+
       - name: Run tests and production frontend build
         run: npm run check
+
+      - name: Verify bundled semantic matching
+        run: npm run model:verify
 
       - name: Check Rust formatting
         run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
@@ -54,15 +60,15 @@ jobs:
           New-Item -ItemType Directory -Force -Path release-artifacts | Out-Null
           $installer = Get-ChildItem "src-tauri/target/release/bundle/nsis/*.exe" | Select-Object -First 1
           if (-not $installer) { throw "The Watchmaker installer was not created." }
-          $output = "release-artifacts/Watchmaker-Setup-v1.0.8.exe"
+          $output = "release-artifacts/Watchmaker-Setup-v1.0.9.exe"
           Copy-Item $installer.FullName $output
           $hash = (Get-FileHash $output -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$hash  Watchmaker-Setup-v1.0.8.exe" | Set-Content "release-artifacts/Watchmaker-Setup-v1.0.8.sha256" -Encoding ascii
+          "$hash  Watchmaker-Setup-v1.0.9.exe" | Set-Content "release-artifacts/Watchmaker-Setup-v1.0.9.sha256" -Encoding ascii
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
-          name: Watchmaker-1.0.8-Windows
+          name: Watchmaker-1.0.9-Windows
           path: desktop/release-artifacts/*
           if-no-files-found: error
           retention-days: 30
